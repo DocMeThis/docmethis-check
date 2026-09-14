@@ -1,0 +1,95 @@
+name: Check CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Tests and package gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout Check
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Actionlint
+        uses: raven-actions/actionlint@3d39aea434753780c3b3d4a1a31c854b4dbf49d7  # v2.2.0
+        with:
+          files: .github/workflows/**/*.yml
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d  # v10.0.1
+        with:
+          version: "0.12.5"
+          enable-cache: true
+          cache-dependency-glob: |
+            pyproject.toml
+            uv.lock
+
+      - name: Setup Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
+        with:
+          python-version: "3.12"
+
+      - name: Install development environment
+        run: >-
+          uv sync --dev --locked
+          --refresh-package docmethis-extract-python
+          --refresh-package docmethis-verify
+
+      - name: Lockfile check
+        run: uv lock --check
+
+      - name: Ruff check
+        run: uv run ruff check src tests
+
+      - name: Ruff format check
+        run: uv run ruff format --check src tests
+
+      - name: Tests
+        run: uv run pytest -q
+
+      - name: Docker Action test
+        env:
+          RUN_DOCKER_TESTS: "1"
+        run: uv run pytest -q tests/check/test_check_c2.py -m docker
+
+      - name: Build wheel and sdist
+        run: uv build
+
+      - name: Verify clean installation of both artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          for artifact in dist/*.whl dist/*.tar.gz; do
+            name="$(basename "${artifact}")"
+            venv="${RUNNER_TEMP}/${name}.venv"
+            python -m venv "${venv}"
+            interpreter="${venv}/bin/python"
+            uv pip install --python "${interpreter}" \
+              --index https://pkg.docmethis.com \
+              --default-index https://pypi.org/simple \
+              "${artifact}"
+            "${interpreter}" -c 'import docmethis_check'
+            "${interpreter}" -m docmethis_check --help
+          done
+
+      - name: Write owner artifact manifest
+        run: uv run python scripts/write_owner_artifact_manifest.py --repository https://github.com/DocMeThis/docmethis-check
+
+      - name: Upload owner artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: docmethis-check-dist-${{ github.sha }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7

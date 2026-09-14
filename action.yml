@@ -1,0 +1,55 @@
+name: "Docstring Check"
+description: "Vérifie la cohérence docstring/code sur les changements"
+
+inputs:
+  project-path:
+    description: "Chemin du projet à checker"
+    required: false
+    default: "."
+  fail-on-warning:
+    description: "Fait échouer le check si au moins un warning est émis. true/false force ; vide = valeur par défaut."
+    required: false
+  include-visibility:
+    description: "Visibilités à checker, séparées par des virgules"
+    required: false
+  profile:
+    description: "Profil de sévérité intégré; vide = configuration pyproject.toml"
+    required: false
+  base-ref:
+    description: "Branche de référence pour le calcul du diff (ex: main)"
+    required: false
+  on-nonlinear-push-without-base:
+    description: "Comportement en cas de push non linéaire sans base_ref configurée : fail, head_commit ou warn. Vide = valeur par défaut."
+    required: false
+  check-mode:
+    description: "Mode de vérification : regression ou catchup. Vide = valeur par défaut (regression)."
+    required: false
+  annotation-placement:
+    description: "Placement des annotations : signature, docstring, precise. Vide = valeur par défaut (signature)."
+    required: false
+  on-missing-base:
+    description: "Comportement si base indisponible : emit_all ou fail. Vide = valeur par défaut (emit_all)."
+    required: false
+
+runs:
+  using: "docker"
+  image: "Dockerfile"
+  args:
+    - "--project-path"
+    - "${{ inputs.project-path }}"
+    - "--fail-on-warning"
+    - "${{ inputs.fail-on-warning }}"
+    - "--include-visibility"
+    - "${{ inputs.include-visibility }}"
+    - "--profile"
+    - "${{ inputs.profile }}"
+    - "--base-ref"
+    - "${{ inputs.base-ref }}"
+    - "--on-nonlinear-push-without-base"
+    - "${{ inputs.on-nonlinear-push-without-base }}"
+    - "--check-mode"
+    - "${{ inputs.check-mode }}"
+    - "--annotation-placement"
+    - "${{ inputs.annotation-placement }}"
+    - "--on-missing-base"
+    - "${{ inputs.on-missing-base }}"

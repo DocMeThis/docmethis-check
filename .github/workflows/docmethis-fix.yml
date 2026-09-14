@@ -1,0 +1,41 @@
+name: DocMeThis Fix
+
+on:
+  workflow_dispatch:
+
+# Skeleton only. This workflow must be connected to the authenticated private
+# runtime distribution before enabling it for consumer pushes.
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    name: Run private DocMeThis Fix runtime
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout consumer repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Pin private runtime by hash
+        env:
+          DOCMETHIS_FIX_DISTRIBUTION_TOKEN: ${{ secrets.DOCMETHIS_FIX_DISTRIBUTION_TOKEN }}
+          DOCMETHIS_FIX_RUNTIME_SHA: ${{ vars.DOCMETHIS_FIX_RUNTIME_SHA }}
+          DOCMETHIS_FIX_ARTIFACT_SHA256: ${{ vars.DOCMETHIS_FIX_ARTIFACT_SHA256 }}
+        run: |
+          set -euo pipefail
+          test -n "$DOCMETHIS_FIX_DISTRIBUTION_TOKEN"
+          [[ "$DOCMETHIS_FIX_RUNTIME_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$DOCMETHIS_FIX_ARTIFACT_SHA256" =~ ^[0-9a-f]{64}$ ]]
+          printf '%s\n' 'Private runtime installation is release-channel specific.'
+          printf 'Runtime commit SHA: %s\n' "$DOCMETHIS_FIX_RUNTIME_SHA"
+          printf 'Artifact SHA-256: %s\n' "$DOCMETHIS_FIX_ARTIFACT_SHA256"
+          printf '%s\n' 'Configure the authenticated installer before enabling this workflow.'
+          exit 1
+
+      - name: Run Check and private Fix
+        run: |
+          printf '%s\n' 'Reserved for the exact private runtime contract.'
+          exit 1

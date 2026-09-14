@@ -1,0 +1,114 @@
+[project]
+name = "docmethis-check"
+version = "0.1.0"
+description = "Diff-first Python docstring consistency checks for CI."
+readme = "README.md"
+requires-python = ">=3.12"
+license = "LicenseRef-DocMeThis-Source-Access"
+license-files = ["LICENSE"]
+dependencies = [
+    "docmethis-extract-python==0.1.0",
+    "docmethis-verify==0.1.0",
+]
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.5.1",
+    "pytest>=9.0.3",
+    "ruff>=0.14.14",
+]
+
+[tool.uv]
+required-version = ">=0.12.5"
+
+[[tool.uv.index]]
+name = "docmethis"
+url = "https://pkg.docmethis.com"
+explicit = true
+
+[tool.uv.sources]
+docmethis-extract-python = { index = "docmethis" }
+docmethis-verify = { index = "docmethis" }
+
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["docmethis_check*"]
+
+[tool.setuptools.package-data]
+docmethis_check = ["defaults/*.toml"]
+
+[tool.ruff]
+line-length = 130
+target-version = "py312"
+exclude = [".venv", ".pytest_cache", ".ruff_cache", "build", "dist", "wheelhouse"]
+
+[tool.ruff.format]
+exclude = ["**/*.md"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--strict-markers --strict-config"
+markers = ["docker: test requiring Docker (skipped locally without RUN_DOCKER_TESTS=1)"]
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = ["D203", "D213", "D401", "COM812"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101", "S108", "S603", "S607", "PLR2004", "PLR0913", "ANN201", "FBT001", "SLF001", "D102", "D103", "ANN003"]
+"scripts/*" = ["INP001", "T201", "S603", "S607"]
+
+[tool.contract-guard]
+# Keep this list aligned with the public Check contracts and their contract tests.
+# Patterns are exact paths or directory prefixes, not globs.
+patterns = [
+    "action.yml",
+    "Dockerfile",
+    "entrypoint.sh",
+    ".github/workflows/docmethis-check.yml",
+    "src/docmethis_check/__init__.py",
+    "src/docmethis_check/__main__.py",
+    "src/docmethis_check/cli.py",
+    "src/docmethis_check/config.py",
+    "src/docmethis_check/models.py",
+    "src/docmethis_check/diagnostics.py",
+    "src/docmethis_check/runner.py",
+    "src/docmethis_check/git_diff.py",
+    "src/docmethis_check/formatters/",
+    "src/docmethis_check/dia/",
+    "src/docmethis_check/defaults/",
+    "tests/test_public_contract.py",
+    "tests/check/test_check_c0.py",
+    "tests/check/test_check_c2.py",
+    "tests/check/test_check_c8.py",
+    "tests/check/test_check_c9_phase0.py",
+    "tests/check/test_check_c9_phase2.py",
+    "tests/check/test_check_c10.py",
+    "tests/check/test_f9_phase4_diff_reporting.py",
+]
+
+[tool.docmethis.check]
+check_mode = "catchup"
+fail_on_warning = true
+include_visibility = ["public", "protected", "private"]
+symbol_kinds = ["function", "method", "class", "module"]
+property_accessors = ["getter", "setter"]
+dia = true
+profile = "strict"
+
+[tool.docmethis.fix]
+docstring-quote-style = "double"
+profile = "openrouter"
+model = "cohere/north-mini-code:free"
+api-config-file = ".github/docmethis-fix/llm_api.toml"
+policy-config-file = ".github/docmethis-fix/llm_policies.toml"
+docstring-language = "en"
+max-concurrency = 5
+include-existing-docstrings = true
+allow-full-rewrite-fallback = false
+allowed-dia-statuses = ["confirmed"]
+scope = "impacted"
