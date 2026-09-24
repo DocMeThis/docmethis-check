@@ -260,8 +260,8 @@ def test_increment_summary_ignores_disabled() -> None:
     assert outcome.summary.error_count == 0
 
 
-def test_warning_format_is_disabled_by_default(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """An Verify warning mapped to a disabled code is absent from checks by default."""
+def test_warning_format_is_enabled_by_standard_profile(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """An Verify warning mapped to a Standard warning is present by default."""
     monkeypatch.setattr(
         "docmethis_check.diagnostics.verify_docstring",
         lambda _: SimpleNamespace(
@@ -279,12 +279,12 @@ def test_warning_format_is_disabled_by_default(monkeypatch: pytest.MonkeyPatch, 
 
     entries, keys = diagnostics_for_function(_function_with_docstring(tmp_path), CheckConfig())
 
-    assert entries == []
-    assert keys == {}
+    assert [(entry.code, entry.severity) for entry in entries] == [("DMT-6051", "warning")]
+    assert next(iter(keys)).code == "DMT-6051"
 
 
 def test_warning_format_is_enabled_by_override(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """An Verify warning disabled by default becomes visible when its severity is configured."""
+    """An Verify warning disabled by the loose profile becomes visible by override."""
     monkeypatch.setattr(
         "docmethis_check.diagnostics.verify_docstring",
         lambda _: SimpleNamespace(
@@ -300,7 +300,10 @@ def test_warning_format_is_enabled_by_override(monkeypatch: pytest.MonkeyPatch, 
         ),
     )
 
-    entries, keys = diagnostics_for_function(_function_with_docstring(tmp_path), CheckConfig(severity={"DMT-6051": "warning"}))
+    entries, keys = diagnostics_for_function(
+        _function_with_docstring(tmp_path),
+        CheckConfig(profile="loose", severity={"DMT-6051": "warning"}),
+    )
 
     assert [(entry.code, entry.severity, entry.message) for entry in entries] == [
         ("DMT-6051", "warning", "blank line missing"),

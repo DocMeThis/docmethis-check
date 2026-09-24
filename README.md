@@ -225,9 +225,11 @@ profile. `include_visibility` remains orthogonal to the profile, and
 
 Profiles are complete `code -> error | warning | disabled` policies, not just
 lists of enabled codes. `loose` keeps missing-docstring and presentation rules
-disabled, `standard` enables documentation presence and contract completeness,
-and `strict` activates all current rules while keeping style findings as
-warnings.
+disabled and focuses on misleading contract drift. `standard` requires public
+documentation and normal contract completeness while keeping presentation
+findings as warnings. `strict` activates every current Check rule and promotes
+additional contract and behavior gaps to errors while keeping style findings
+as warnings.
 
 Valid severity values are `error`, `warning`, and `disabled`. CLI options
 override `pyproject.toml`; run `python -m docmethis_check --help` for the live

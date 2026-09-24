@@ -1007,7 +1007,7 @@ def test_emission_io_observed_then_changed_unverified(tmp_path: Path) -> None:
     assert len(unchanged_emissions) == 1
     _, result_unchanged = unchanged_emissions[0]
     assert result_unchanged.entry is not None
-    assert result_unchanged.entry.severity == "error"
+    assert result_unchanged.entry.severity == "warning"
     assert result_unchanged.entry.code == DMT_7302
     assert result_unchanged.impact is not None
     assert result_unchanged.impact.status == "documentation_unchanged"
@@ -1079,7 +1079,7 @@ def test_emission_class_inheritance_change_warning(tmp_path: Path) -> None:
     assert inheritance
     _, outcome = inheritance[0]
     assert outcome.entry is not None
-    assert outcome.entry.severity == "error"
+    assert outcome.entry.severity == "warning"
     assert outcome.entry.code == DMT_5202
     assert outcome.meta is not None
     assert outcome.meta.fixable is True
@@ -1669,7 +1669,7 @@ def test_demo_three_featured_cases(tmp_path: Path) -> None:
     assert dia_codes.count(DMT_4201) >= 3
 
     dia_errors = [check for check in outcome.checks if check.dia is not None and check.severity == "error"]
-    assert [check.symbol for check in dia_errors] == ["pricing.grille.unit_price", "pricing.promotions.apply_promotion"]
+    assert [check.symbol for check in dia_errors] == ["pricing.grille.unit_price"]
 
     dia_symbols = {check.symbol for check in outcome.checks if check.dia is not None}
     assert not any(symbol.endswith("_read_grid") for symbol in dia_symbols)
@@ -1724,7 +1724,7 @@ def test_observable_property_delta_emission(tmp_path: Path) -> None:
     assert delta.direction == "ajouté"
     assert outcome.entry is not None
     assert outcome.entry.code == DMT_7303
-    assert outcome.entry.severity == "error"
+    assert outcome.entry.severity == "warning"
     assert outcome.impact is not None
     assert outcome.impact.status == "documentation_unchanged"
 

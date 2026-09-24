@@ -157,7 +157,7 @@ def test_class_reports_undocumented_local_exception(tmp_path: Path) -> None:
     )
 
     assert [(entry.code, entry.severity, entry.diagnostic_key.expected) for entry in entries] == [
-        ("DMT-4301", "error", "valueerror")
+        ("DMT-4301", "warning", "valueerror")
     ]
     assert entries[0].annotation_line == 12
     assert keys[entries[0].diagnostic_key] == 1
