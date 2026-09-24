@@ -213,7 +213,7 @@ class BaseSnapshot:
     relative_path : str
         Path of the file relative to the project root.
     record : ModuleRecord | None
-        Extracted module record, or None when extraction failed.
+        Extracted module record, or None when the file is absent from the base or extraction failed.
 
     """
 
@@ -1716,11 +1716,14 @@ def _base_snapshot_or_none(
         snapshot = None
     else:
         content = _base_content_or_none(base_rev, relative_path, project_root)
-        snapshot = (
-            None
-            if content is None
-            else BaseSnapshot(relative_path=relative_path, record=_extract_module_record_snapshot(content, relative_path))
-        )
+        if content is None and _base_path_is_absent(base_rev, relative_path, project_root):
+            snapshot = BaseSnapshot(relative_path=relative_path, record=None)
+        else:
+            snapshot = (
+                None
+                if content is None
+                else BaseSnapshot(relative_path=relative_path, record=_extract_module_record_snapshot(content, relative_path))
+            )
 
     if snapshot_cache is not None:
         snapshot_cache[cache_key] = snapshot
@@ -1760,6 +1763,39 @@ def _base_content_or_none(base_rev: str, relative_path: str, project_root: Path)
         return None
     except (subprocess.CalledProcessError, OSError):
         return None
+
+
+def _base_path_is_absent(base_rev: str, relative_path: str, project_root: Path) -> bool:
+    """Return whether a path is absent from an otherwise available base revision.
+
+    Parameters
+    ----------
+    base_rev : str
+        The revision to inspect.
+    relative_path : str
+        Project-relative path to look up in the revision.
+    project_root : Path
+        Root directory used as the Git working directory.
+
+    Returns
+    -------
+    bool
+        True when Git can inspect the revision and the path is absent; False when the path exists or the lookup is inconclusive.
+
+    """
+    try:
+        git = git_executable()
+        result = subprocess.run(  # noqa: S603
+            [git, "ls-tree", "-r", "--name-only", base_rev, "--", relative_path],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=_GIT_SHOW_TIMEOUT_SECONDS,
+            cwd=project_root,
+        )
+    except (subprocess.TimeoutExpired, OSError):
+        return False
+    return result.returncode == 0 and not result.stdout.strip()
 
 
 def _extract_module_record_snapshot(content: str, relative_path: str) -> ModuleRecord | None:

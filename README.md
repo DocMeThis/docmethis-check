@@ -243,6 +243,11 @@ Useful policy choices:
 - `method_exception_contract`: `callable` (default) or `class_aggregate`.
 - `on_nonlinear_push_without_base`: `fail`, `head_commit`, or `warn`.
 
+When regression filtering cannot retrieve a file's base snapshot, `emit_all`
+reports the current diagnostics without subtracting historical findings, while
+`fail` stops the check. A file added by the change is treated as having an empty
+base and is not considered an unavailable snapshot.
+
 ## Diagnostic Codes
 
 Check emits native `DMT-XXXX` codes whose numbering and meaning are derived
