@@ -22,6 +22,16 @@ jobs:
         with:
           fetch-depth: 0
 
+      # Cache extraction records across runs; the extractor validates file hashes and its own fingerprint.
+      - name: Restore DocMeThis extraction cache
+        id: docmethis-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: .docmethis_cache.json
+          key: docmethis-extract-v5-${{ runner.os }}-${{ hashFiles('pyproject.toml') }}-${{ github.sha }}
+          restore-keys: |
+            docmethis-extract-v5-${{ runner.os }}-${{ hashFiles('pyproject.toml') }}-
+
       # Security note: @main follows the latest code on the DocMeThis Check
       # main branch. This repository uses it to test the action itself. When
       # copying this workflow, replace @main with the full commit SHA associated
@@ -36,3 +46,12 @@ jobs:
           fail-on-warning: true
           annotation-placement: precise
           on-nonlinear-push-without-base: warn
+
+      - name: Save DocMeThis extraction cache
+        if: >-
+          always() && steps.docmethis-cache.outputs.cache-hit != 'true' &&
+          hashFiles('.docmethis_cache.json') != ''
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: .docmethis_cache.json
+          key: ${{ steps.docmethis-cache.outputs.cache-primary-key }}
