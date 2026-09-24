@@ -815,6 +815,29 @@ class TestRegressionC5:
         assert any(c.symbol == "module.new" and c.code == "DMT-1120" for c in outcome.checks)
         assert not any(c.symbol == "module.existante" for c in outcome.checks)
 
+    def test_regression_new_file_does_not_require_base_snapshot(self, tmp_path: Path) -> None:
+        """A new file is treated as having an empty base even in strict regression mode."""
+        _initialize_repo(tmp_path)
+        _write_module(
+            tmp_path,
+            '''
+            def existante() -> int:
+                """Already documented."""
+                return 1
+        ''',
+        )
+        _commit(tmp_path, "initial")
+
+        new_file = tmp_path / "new.py"
+        new_file.write_text("def nouvelle() -> int:\n    return 2\n", encoding="utf-8")
+        _commit(tmp_path, "add module")
+
+        config = load_check_config(tmp_path, check_mode="regression", on_missing_base="fail")
+        outcome = run_check(str(tmp_path), git_diff="HEAD~1..HEAD", config=config)
+
+        assert outcome.diff_completeness == "complete"
+        assert any(check.file == "new.py" and check.code == "DMT-1120" for check in outcome.checks)
+
     def test_catchup_unchanged(self, tmp_path: Path) -> None:
         """In catchup mode, all diagnostics are emitted without filtering."""
         _initialize_repo(tmp_path)
