@@ -18,7 +18,7 @@ jobs:
       # Keep the project's history so Check can compare the submitted version
       # with the previous version.
       - name: Check out the repository and its history
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           fetch-depth: 0
 
