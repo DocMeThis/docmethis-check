@@ -19,7 +19,7 @@ from docmethis_extract_python.api import (
     iter_functions,
 )
 
-from docmethis_check.config import CheckConfig, load_check_config
+from docmethis_check.config import CheckConfig, load_check_config, path_matches_filters
 from docmethis_check.dia import _analyze_documentation_impacts
 from docmethis_check.diagnostics import base_classes, base_diagnostics, base_functions, diagnostics_for_file
 from docmethis_check.git_diff import ChangedFile, DiffRange, discover_changed_python_files
@@ -342,19 +342,28 @@ def run_check(  # noqa: PLR0913 - public API; the parameter count is intentional
         else configuration.on_nonlinear_push_without_base
     )
 
-    changed_files_list, diff_range = discover_changed_python_files(
+    discovered_files_list, diff_range = discover_changed_python_files(
         root,
         git_diff=git_diff,
         base_ref=effective_base_ref,
         on_nonlinear_push_without_base=effective_on_nonlinear,
     )
+    changed_files_list = [
+        changed_file
+        for changed_file in discovered_files_list
+        if not path_matches_filters(changed_file.path, root, configuration.exclude_paths)
+    ]
+    dia_filters = configuration.exclude_paths + configuration.dia_exclude_paths
+    dia_changed_files_list = [
+        changed_file for changed_file in changed_files_list if not path_matches_filters(changed_file.path, root, dia_filters)
+    ]
     changed_files = {changed_file.path: changed_file for changed_file in changed_files_list}
 
     result = CheckResult()
     result.diff_strategy = diff_range.strategy
     result.diff_completeness = diff_range.completeness
     result.diff_reason = diff_range.reason
-    result.diff_files = [_changed_file_to_dict(changed_file) for changed_file in changed_files_list]
+    result.diff_files = [_changed_file_to_dict(changed_file) for changed_file in discovered_files_list]
 
     if diff_range.revision_spec is None:
         if configuration.dia:
@@ -370,7 +379,7 @@ def run_check(  # noqa: PLR0913 - public API; the parameter count is intentional
             root,
             skip_dynamic=True,
             write_cache=write_cache,
-            raw_records=raw_records if configuration.dia else None,
+            raw_records=raw_records if configuration.dia and (dia_changed_files_list or not discovered_files_list) else None,
         )
     finally:
         # Parse failures are rendered in the report instead of leaking as a separate warning line.
@@ -381,15 +390,18 @@ def run_check(  # noqa: PLR0913 - public API; the parameter count is intentional
     _execute_file_diagnostics(files_by_module, affected_symbols, result, ctx)
 
     if configuration.dia:
-        _execute_dia(
-            result,
-            project=project_record,
-            raw_records=raw_records,
-            diff_files=changed_files_list,
-            base_rev=diff_range.base_rev,
-            root=root,
-            configuration=configuration,
-        )
+        if dia_changed_files_list or not discovered_files_list:
+            _execute_dia(
+                result,
+                project=project_record,
+                raw_records=raw_records,
+                diff_files=dia_changed_files_list,
+                base_rev=diff_range.base_rev,
+                root=root,
+                configuration=configuration,
+            )
+        else:
+            result.impact_analysis = ImpactAnalysis(completeness="complete", reason="all_paths_excluded")
 
     result.analysis_errors = _analysis_errors(project_record, changed_files, root)
     result.checked_files = sorted(str(path) for path in files_by_module)
@@ -508,15 +520,7 @@ def _collect_affected_symbols(  # noqa: C901, PLR0912
     affected_symbols: set[_SymbolCheck] = set()
     files_by_module: dict[Path, list[_SymbolCheck]] = {}
     deleted_symbols_cache: dict[Path, set[_SymbolCheck]] = {}
-    affected_modules = [
-        module
-        for module in project.modules
-        if module.file_path.resolve() in changed_files
-        # These conditions intentionally overlap: ``module_name.startswith("test_")``
-        # covers test directories, while ``is_test`` covers M1-marked files.
-        and not module.module_name.startswith("test_")
-        and not module.is_test
-    ]
+    affected_modules = [module for module in project.modules if module.file_path.resolve() in changed_files]
     for module in affected_modules:
         path = module.file_path.resolve()
         changed_file = changed_files.get(path)

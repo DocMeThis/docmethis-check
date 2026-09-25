@@ -8,7 +8,13 @@ import argparse
 import sys
 from pathlib import Path
 
-from docmethis_check.config import load_check_config, parse_include_visibility, parse_property_accessors, parse_symbol_kinds
+from docmethis_check.config import (
+    load_check_config,
+    parse_include_visibility,
+    parse_path_filters,
+    parse_property_accessors,
+    parse_symbol_kinds,
+)
 from docmethis_check.formatters.github import format as format_github
 from docmethis_check.formatters.json import format as format_json
 from docmethis_check.formatters.text import format as format_text
@@ -129,6 +135,18 @@ def create_parser() -> argparse.ArgumentParser:
         help="Property accessors to check, comma-separated: getter,setter (default: getter,setter)",
     )
     parser.add_argument(
+        "--exclude-paths",
+        type=str,
+        default=None,
+        help="Project-relative files or directories to exclude from Check and DIA, comma-separated (default: configuration)",
+    )
+    parser.add_argument(
+        "--dia-exclude-paths",
+        type=str,
+        default=None,
+        help="Project-relative files or directories to exclude from DIA only, comma-separated (default: configuration)",
+    )
+    parser.add_argument(
         "--profile",
         type=str,
         choices=("loose", "standard", "strict"),
@@ -229,6 +247,8 @@ def main(argv: list[str] | None = None) -> int:
         include_visibility = parse_include_visibility(args.include_visibility) if args.include_visibility else None
         symbol_kinds = parse_symbol_kinds(args.symbol_kinds) if args.symbol_kinds else None
         property_accessors = parse_property_accessors(args.property_accessors) if args.property_accessors else None
+        exclude_paths = parse_path_filters(args.exclude_paths) if args.exclude_paths is not None else None
+        dia_exclude_paths = parse_path_filters(args.dia_exclude_paths) if args.dia_exclude_paths is not None else None
         config = load_check_config(
             args.project,
             fail_on_warning=args.fail_on_warning,
@@ -241,6 +261,8 @@ def main(argv: list[str] | None = None) -> int:
             on_missing_base=args.on_missing_base,
             method_exception_contract=args.method_exception_contract,
             dia=args.dia,
+            exclude_paths=exclude_paths,
+            dia_exclude_paths=dia_exclude_paths,
         )
         result = run_check(
             project=args.project,

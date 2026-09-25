@@ -16,7 +16,7 @@ import pytest
 from docmethis_extract_python.api import PropertyAccessor, Visibility
 
 from docmethis_check import cli, diagnostics
-from docmethis_check.config import CheckConfig, load_check_config
+from docmethis_check.config import CheckConfig, load_check_config, parse_path_filters, path_matches_filters
 from docmethis_check.formatters.github import format as format_github
 from docmethis_check.models import (
     AnnotationPlacement,
@@ -97,6 +97,43 @@ def test_config_loads_severity_and_fail_on_warning(tmp_path: Path) -> None:
     assert config.fail_on_warning is True
     assert config.include_visibility == frozenset({Visibility.PUBLIC, Visibility.PROTECTED})
     assert config.severity_for("DMT-1120", "error") == "warning"
+
+
+def test_config_loads_path_filters_and_matches_directory_boundaries(tmp_path: Path) -> None:
+    """Path filters load from pyproject and match files without prefix collisions.
+
+    Parameters
+    ----------
+    tmp_path : Path
+        Temporary project root used for the configuration file and path checks.
+
+    """
+    (tmp_path / "pyproject.toml").write_text(
+        """
+[tool.docmethis.check]
+exclude_paths = ["tests", "generated.py"]
+dia_exclude_paths = ["fixtures"]
+""".strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    config = load_check_config(tmp_path)
+
+    assert config.exclude_paths == ("tests", "generated.py")
+    assert config.dia_exclude_paths == ("fixtures",)
+    assert parse_path_filters("tests, generated.py") == ("tests", "generated.py")
+    assert path_matches_filters(tmp_path / "tests" / "unit.py", tmp_path, config.exclude_paths)
+    assert path_matches_filters(tmp_path / "generated.py", tmp_path, config.exclude_paths)
+    assert not path_matches_filters(tmp_path / "testsuite" / "unit.py", tmp_path, config.exclude_paths)
+
+
+def test_config_rejects_unsafe_path_filters() -> None:
+    """Path filters stay relative and do not accept glob syntax."""
+    with pytest.raises(ValueError, match="parent-directory"):
+        CheckConfig(exclude_paths=("../tests",))
+    with pytest.raises(ValueError, match="glob"):
+        CheckConfig(exclude_paths=("tests/*",))
 
 
 def test_config_loads_builtin_profile_before_code_overrides(tmp_path: Path) -> None:
@@ -383,6 +420,84 @@ def test_run_check_filters_by_include_visibility(tmp_path: Path) -> None:
 
     assert {check.code for check in outcome.checks} == {"DMT-1220", "DMT-3001"}
     assert outcome.checks[0].symbol == "module._protected"
+
+
+def test_run_check_checks_test_modules_unless_excluded(tmp_path: Path) -> None:
+    """Test modules are checked by default and can be excluded explicitly.
+
+    Parameters
+    ----------
+    tmp_path : Path
+        Temporary Git repository containing the changed test module.
+
+    """
+    _initialize_repo(tmp_path)
+    tests_dir = tmp_path / "tests"
+    tests_dir.mkdir()
+    source_file = tests_dir / "test_module.py"
+    source_file.write_text('"""Module summary."""\n', encoding="utf-8")
+    _commit(tmp_path, "initial")
+    source_file.write_text("VALUE = 1\n", encoding="utf-8")
+
+    config = CheckConfig(dia=False, symbol_kinds=frozenset({SymbolKind.MODULE}))
+    outcome = run_check(tmp_path, config=config)
+
+    assert outcome.checks
+    assert outcome.checked_files == [str(source_file)]
+
+    excluded = run_check(
+        tmp_path,
+        config=CheckConfig(dia=False, symbol_kinds=frozenset({SymbolKind.MODULE}), exclude_paths=("tests",)),
+    )
+
+    assert excluded.checks == []
+    assert excluded.checked_files == []
+    assert excluded.diff_files == [{"path": str(source_file), "changed_lines": [1], "deleted_lines": [1]}]
+
+
+def test_dia_path_exclusion_keeps_direct_checks(tmp_path: Path) -> None:
+    """DIA-only exclusions suppress impacts without suppressing direct Check diagnostics.
+
+    Parameters
+    ----------
+    tmp_path : Path
+        Temporary Git repository containing the changed test module.
+
+    """
+    _initialize_repo(tmp_path)
+    tests_dir = tmp_path / "tests"
+    tests_dir.mkdir()
+    source_file = tests_dir / "test_module.py"
+    source_file.write_text(
+        dedent(
+            '''
+            def process(value: int) -> int:
+                """Process a value."""
+                return value
+            '''
+        ).lstrip(),
+        encoding="utf-8",
+    )
+    _commit(tmp_path, "initial")
+    source_file.write_text(
+        dedent(
+            '''
+            def process(value: int) -> int:
+                """Process a value."""
+                if value < 0:
+                    raise ValueError("negative")
+                return value
+            '''
+        ).lstrip(),
+        encoding="utf-8",
+    )
+
+    outcome = run_check(tmp_path, config=CheckConfig(profile="strict", dia_exclude_paths=("tests",)))
+
+    assert outcome.checks
+    assert all(check.dia is None for check in outcome.checks)
+    assert outcome.impact_analysis is not None
+    assert outcome.impact_analysis.reason == "all_paths_excluded"
 
 
 def test_run_check_effective_visibility_for_internal_module(tmp_path: Path) -> None:

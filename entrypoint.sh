@@ -10,6 +10,8 @@ on_nonlinear_push_without_base=""
 check_mode=""
 annotation_placement=""
 on_missing_base=""
+exclude_paths=""
+dia_exclude_paths=""
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -47,6 +49,14 @@ while [ "$#" -gt 0 ]; do
       ;;
     --on-missing-base)
       on_missing_base="${2:-}"
+      shift 2
+      ;;
+    --exclude-paths)
+      exclude_paths="${2:-}"
+      shift 2
+      ;;
+    --dia-exclude-paths)
+      dia_exclude_paths="${2:-}"
       shift 2
       ;;
     *)
@@ -101,6 +111,14 @@ fi
 
 if [ -n "$on_missing_base" ]; then
   set -- "$@" --on-missing-base "$on_missing_base"
+fi
+
+if [ -n "$exclude_paths" ]; then
+  set -- "$@" --exclude-paths "$exclude_paths"
+fi
+
+if [ -n "$dia_exclude_paths" ]; then
+  set -- "$@" --dia-exclude-paths "$dia_exclude_paths"
 fi
 
 if [ -n "${GITHUB_WORKSPACE:-}" ]; then

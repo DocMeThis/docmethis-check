@@ -30,6 +30,12 @@ inputs:
   on-missing-base:
     description: "Comportement si base indisponible : emit_all ou fail. Vide = valeur par défaut (emit_all)."
     required: false
+  exclude-paths:
+    description: "Fichiers ou répertoires relatifs à exclure de Check et DIA, séparés par des virgules. Vide = pyproject.toml."
+    required: false
+  dia-exclude-paths:
+    description: "Fichiers ou répertoires relatifs à exclure de DIA uniquement, séparés par des virgules. Vide = pyproject.toml."
+    required: false
 
 runs:
   using: "docker"
@@ -53,3 +59,7 @@ runs:
     - "${{ inputs.annotation-placement }}"
     - "--on-missing-base"
     - "${{ inputs.on-missing-base }}"
+    - "--exclude-paths"
+    - "${{ inputs.exclude-paths }}"
+    - "--dia-exclude-paths"
+    - "${{ inputs.dia-exclude-paths }}"
