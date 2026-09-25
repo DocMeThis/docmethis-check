@@ -397,6 +397,22 @@ def test_cli_no_fail_on_warning_overrides_pyproject(
     assert "DocMeThis Check — WARN" in capsys.readouterr().out
 
 
+def test_cli_analysis_errors_fail_the_check(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Analysis failures are blocking even when no diagnostic has been emitted."""
+    outcome = CheckResult()
+    outcome.analysis_errors = [{"file": "broken.py", "type": "parse_error", "message": "Unable to parse the file."}]
+    monkeypatch.setattr(cli, "run_check", lambda **_: outcome)
+
+    assert cli.main([str(tmp_path)]) == 1
+    output = capsys.readouterr().out
+    assert "DocMeThis Check — FAIL" in output
+    assert "Skipped: broken.py" in output
+
+
 def test_run_check_filters_by_include_visibility(tmp_path: Path) -> None:
     """Protected functions are checked only when the policy includes them."""
     _initialize_repo(tmp_path)
