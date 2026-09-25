@@ -7,7 +7,7 @@ from __future__ import annotations
 import tomllib
 from dataclasses import dataclass, field, replace
 from importlib import resources
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, cast
 
 from docmethis_extract_python.api import PropertyAccessor, Visibility
@@ -30,8 +30,10 @@ __all__ = [
     "CheckConfig",
     "load_check_config",
     "parse_include_visibility",
+    "parse_path_filters",
     "parse_property_accessors",
     "parse_symbol_kinds",
+    "path_matches_filters",
 ]
 
 _SECTION_CHECK = ("tool", "docmethis", "check")
@@ -110,6 +112,85 @@ def _normalize_profile(value: object) -> str:
     return profile
 
 
+def _normalize_path_filters(value: object, *, field: str) -> tuple[str, ...]:
+    """Normalize project-relative exact paths and directory prefixes.
+
+    Parameters
+    ----------
+    value : object
+        Path filter values loaded from configuration or supplied directly.
+    field : str
+        Configuration field name used in validation errors.
+
+    Returns
+    -------
+    tuple[str, ...]
+        Deduplicated normalized path filters.
+
+    Raises
+    ------
+    TypeError
+        If the value is not a list or tuple of strings.
+    ValueError
+        If a path is empty, absolute, unsafe, or uses glob syntax.
+
+    """
+    if not isinstance(value, (list, tuple)):
+        msg = f"{field} must be a list of strings."
+        raise TypeError(msg)
+
+    normalized: list[str] = []
+    for item in value:
+        if not isinstance(item, str):
+            msg = f"{field} must contain only strings."
+            raise TypeError(msg)
+        path = item.strip().replace("\\", "/")
+        if not path or path == ".":
+            msg = f"{field} must not contain empty or current-directory paths."
+            raise ValueError(msg)
+        if path.startswith("/") or (len(path) > 1 and path[1] == ":"):
+            msg = f"{field} must contain paths relative to the project root."
+            raise ValueError(msg)
+        if any(character in path for character in "*?["):
+            msg = f"{field} does not support glob patterns: {item!r}"
+            raise ValueError(msg)
+
+        pure_path = PurePosixPath(path)
+        if ".." in pure_path.parts:
+            msg = f"{field} must not contain parent-directory components: {item!r}"
+            raise ValueError(msg)
+        normalized.append(pure_path.as_posix().rstrip("/"))
+
+    return tuple(dict.fromkeys(normalized))
+
+
+def path_matches_filters(path: Path, root: Path, filters: tuple[str, ...]) -> bool:
+    """Return whether a path matches an exact filter or a directory prefix.
+
+    Parameters
+    ----------
+    path : Path
+        File path to compare with the configured filters.
+    root : Path
+        Project root used to make the file path relative.
+    filters : tuple[str, ...]
+        Normalized project-relative exact paths or directory prefixes.
+
+    Returns
+    -------
+    bool
+        True when the path is excluded by one of the filters.
+
+    """
+    if not filters:
+        return False
+    try:
+        relative = path.resolve().relative_to(root.resolve()).as_posix()
+    except ValueError:
+        return False
+    return any(relative == item or relative.startswith(f"{item}/") for item in filters)
+
+
 @dataclass(frozen=True, slots=True)
 class CheckConfig:
     """Configurable OSS check policy.
@@ -144,6 +225,10 @@ class CheckConfig:
         Terms forbidden in the docstring.
     method_exception_contract : MethodExceptionContract
         Documentation owner for exceptions exposed by class methods.
+    exclude_paths : tuple[str, ...]
+        Project-relative files or directory prefixes excluded from Check and DIA.
+    dia_exclude_paths : tuple[str, ...]
+        Project-relative files or directory prefixes excluded from DIA only.
 
     Raises
     ------
@@ -171,6 +256,8 @@ class CheckConfig:
     dia: bool = True
     forbidden_terms: tuple[str, ...] = ()
     method_exception_contract: MethodExceptionContract = MethodExceptionContract.CALLABLE
+    exclude_paths: tuple[str, ...] = ()
+    dia_exclude_paths: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         """Validate the direct Check configuration contract.
@@ -178,7 +265,11 @@ class CheckConfig:
         Raises
         ------
         ValueError
-            Explicitly raised.
+            Explicitly raised when a configured value is invalid.
+
+        Notes
+        -----
+        Path filters are normalized after the scalar and collection settings are validated.
 
         """
         type_check(value=self.fail_on_warning, expected_alias_type=StrictBool, field="fail_on_warning")
@@ -225,6 +316,13 @@ class CheckConfig:
             msg = "check_mode='survey' is not implemented yet. Supported values: regression, catchup."
             raise ValueError(msg)
 
+        object.__setattr__(self, "exclude_paths", _normalize_path_filters(self.exclude_paths, field="exclude_paths"))
+        object.__setattr__(
+            self,
+            "dia_exclude_paths",
+            _normalize_path_filters(self.dia_exclude_paths, field="dia_exclude_paths"),
+        )
+
     def severity_for(self, code: str, default: Severity) -> Severity:
         """Return the effective severity for a diagnostic code.
 
@@ -258,6 +356,8 @@ def load_check_config(  # noqa: C901, PLR0913
     on_missing_base: str | None = None,
     method_exception_contract: str | None = None,
     dia: bool | None = None,
+    exclude_paths: tuple[str, ...] | None = None,
+    dia_exclude_paths: tuple[str, ...] | None = None,
 ) -> CheckConfig:
     """Load configuration from `pyproject.toml`, then apply CLI overrides.
 
@@ -302,6 +402,12 @@ def load_check_config(  # noqa: C901, PLR0913
     dia : bool | None = None
         Whether to enable diagnostic annotations (dia). When set to True, diagnostic annotations are enabled; when False, they are
         disabled. If None, the value from the configuration file is used.
+    exclude_paths : tuple[str, ...] | None = None
+        Project-relative files or directory prefixes to exclude from Check and DIA. When None, the values from the configuration
+        file are used.
+    dia_exclude_paths : tuple[str, ...] | None = None
+        Project-relative files or directory prefixes to exclude from DIA while keeping direct Check enabled. When None, the values
+        from the configuration file are used.
 
     Returns
     -------
@@ -336,6 +442,8 @@ def load_check_config(  # noqa: C901, PLR0913
         ),
         dia=_read_bool(section, "dia", default=True),
         forbidden_terms=_load_forbidden_terms(root),
+        exclude_paths=_read_path_filters(section, "exclude_paths"),
+        dia_exclude_paths=_read_path_filters(section, "dia_exclude_paths"),
     )
 
     if fail_on_warning is not None:
@@ -380,6 +488,12 @@ def load_check_config(  # noqa: C901, PLR0913
 
     if dia is not None:
         config = replace(config, dia=dia)
+
+    if exclude_paths is not None:
+        config = replace(config, exclude_paths=exclude_paths)
+
+    if dia_exclude_paths is not None:
+        config = replace(config, dia_exclude_paths=dia_exclude_paths)
 
     return config
 
@@ -440,6 +554,23 @@ def parse_include_visibility(value: str) -> frozenset[Visibility]:
         raise ValueError(msg)
 
     return frozenset(_visibility_from_name(name) for name in names)
+
+
+def parse_path_filters(value: str) -> tuple[str, ...]:
+    """Parse a comma-separated list of project-relative path filters.
+
+    Parameters
+    ----------
+    value : str
+        Comma-separated exact paths or directory prefixes.
+
+    Returns
+    -------
+    tuple[str, ...]
+        Deduplicated normalized path filters.
+
+    """
+    return _normalize_path_filters([name.strip() for name in value.split(",") if name.strip()], field="path filters")
 
 
 def parse_symbol_kinds(value: str) -> frozenset[SymbolKind]:
@@ -727,6 +858,25 @@ def _read_property_accessors(section: dict[str, object]) -> frozenset[PropertyAc
         normalize_str_enum_value(value=item, enum_type=PropertyAccessor, field="tool.docmethis.check.property_accessors[]")
         for item in value
     )
+
+
+def _read_path_filters(section: dict[str, object], key: str) -> tuple[str, ...]:
+    """Read project-relative path filters from the Check configuration.
+
+    Parameters
+    ----------
+    section : dict[str, object]
+        Parsed ``tool.docmethis.check`` configuration.
+    key : str
+        Configuration key containing the path filters.
+
+    Returns
+    -------
+    tuple[str, ...]
+        Deduplicated normalized path filters, or an empty tuple when absent.
+
+    """
+    return _normalize_path_filters(section.get(key, []), field=f"tool.docmethis.check.{key}")
 
 
 def _read_severities(section: dict[str, object]) -> dict[str, Severity]:

@@ -242,6 +242,13 @@ Useful policy choices:
 - `on_missing_base`: `emit_all` or `fail`.
 - `method_exception_contract`: `callable` (default) or `class_aggregate`.
 - `on_nonlinear_push_without_base`: `fail`, `head_commit`, or `warn`.
+- `exclude_paths`: project-relative files or directory prefixes excluded from Check and DIA.
+- `dia_exclude_paths`: project-relative files or directory prefixes excluded from DIA only.
+
+Path filters use exact paths or directory prefixes, not glob patterns. For example,
+`dia_exclude_paths = ["tests"]` keeps direct documentation checks enabled for
+tests while suppressing DIA findings on test paths. Excluded files remain
+available as analysis context for other files.
 
 ## Diagnostic Codes
 

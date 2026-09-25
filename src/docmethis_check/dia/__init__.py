@@ -23,6 +23,7 @@ from docmethis_extract_python.api import (
 )
 from docmethis_verify.dmt import DIA_CODE_BY_IMPACT_KIND  # noqa: F401
 
+from docmethis_check.config import path_matches_filters
 from docmethis_check.diagnostics import (
     DiagnosticKey,  # noqa: F401
     _base_content_or_none,
@@ -408,24 +409,33 @@ def _analyze_documentation_impacts(  # noqa: PLR0913, PLR0917
             symbol_contexts=head_contexts,
         )
         deltas = _behavioral_delta(base_keys, head_keys)
+        head_index = _index_symbols(project_head)
+        diff_paths = {changed_file.path.resolve() for changed_file in diff_files}
+        dia_filters = check_config.exclude_paths + check_config.dia_exclude_paths
 
         callgraph_base = build_callgraph(base)
         callgraph_head = build_callgraph(project_head)
 
-        exception_symbols = {delta.symbol for delta in deltas if delta.field == "exception"}
+        exception_symbols = {
+            delta.symbol
+            for delta in deltas
+            if delta.field == "exception"
+            and (record := head_index.get(delta.symbol)) is not None
+            and record.file_path.resolve() in diff_paths
+            and not path_matches_filters(record.file_path, project_root, dia_filters)
+        }
         affected_callers = _affected_callers(callgraph_base, callgraph_head, exception_symbols)
         deltas = _mark_affected_callers(deltas, affected_callers)
 
-        diff_paths = {changed_file.path.resolve() for changed_file in diff_files}
         cause_symbols = {
             symbol
-            for symbol, record in _index_symbols(project_head).items()
+            for symbol, record in head_index.items()
             if symbol in exception_symbols and record.file_path.resolve() in diff_paths
         }
 
         emission = DiaEmissionContext(
             configuration=check_config,
-            records_head=_index_symbols(project_head),
+            records_head=head_index,
             records_base=_index_symbols(base),
             completeness=models.completeness,
             project_root=project_root,
@@ -439,6 +449,11 @@ def _analyze_documentation_impacts(  # noqa: PLR0913, PLR0917
         entries: list[CheckEntry] = []
         impacts: list[dict[str, object]] = []
         for delta in deltas:
+            record_head = head_index.get(delta.symbol)
+            if record_head is None:
+                continue
+            if path_matches_filters(record_head.file_path, project_root, dia_filters):
+                continue
             emission_result = _emit_dia_delta(emission, delta)
             if emission_result.impact is not None:
                 impact = emission_result.impact
