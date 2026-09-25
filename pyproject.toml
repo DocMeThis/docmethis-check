@@ -92,24 +92,26 @@ patterns = [
 ]
 
 [tool.docmethis.check]
-check-mode = "catchup"
-fail-on-warning = true
-include-visibility = ["public", "protected", "private"]
-symbol-kinds = ["function", "method", "class", "module"]
-property-accessors = ["getter", "setter"]
+annotation-placement = "precise"
+check-mode = "regression"
 dia = true
 exclude-paths = ["tests"]
+fail-on-warning = true
+include-visibility = ["public", "protected", "private"]
 profile = "strict"
+property-accessors = ["getter", "setter"]
+on-nonlinear-push-without-base = "warn"
+symbol-kinds = ["function", "method", "class", "module"]
 
 [tool.docmethis.fix]
-docstring-quote-style = "double"
-profile = "openrouter"
-model = "cohere/north-mini-code:free"
-api-config-file = ".github/docmethis-fix/llm_api.toml"
-policy-config-file = ".github/docmethis-fix/llm_policies.toml"
-docstring-language = "en"
-max-concurrency = 5
-include-existing-docstrings = true
 allow-full-rewrite-fallback = false
 allowed-dia-statuses = ["confirmed"]
+api-config-file = ".github/docmethis-fix/llm_api.toml"
+docstring-language = "en"
+docstring-quote-style = "double"
+include-existing-docstrings = true
+max-concurrency = 5
+model = "cohere/north-mini-code:free"
+policy-config-file = ".github/docmethis-fix/llm_policies.toml"
+profile = "openrouter"
 scope = "impacted"

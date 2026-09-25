@@ -1,12 +1,11 @@
 # Copy this workflow into a target repository to add DocMeThis Check.
 # It runs Check only: the action reports findings and never applies Fix patches.
-name: Documentation consistency
+name: DocMeThis Check
 
 on:
   pull_request:
   push:
     branches: [main]
-  workflow_dispatch:
 
 permissions:
   contents: read
@@ -40,12 +39,6 @@ jobs:
         uses: DocMeThis/docmethis-check@main
         env:
           GITHUB_BEFORE_SHA: ${{ github.event.before }}
-        with:
-          project-path: .
-          check-mode: regression
-          fail-on-warning: true
-          annotation-placement: precise
-          on-nonlinear-push-without-base: warn
 
       - name: Save DocMeThis extraction cache
         if: >-
