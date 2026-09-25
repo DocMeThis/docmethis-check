@@ -739,7 +739,7 @@ def _source_f_value_key(addition: str = "") -> str:
 
 
 def test_emission_contradiction_exception_exposed(tmp_path: Path) -> None:
-    """A local exposed exception absent from Raises is a Standard warning."""
+    """A local exposed exception absent from Raises with an unchanged docstring is an error."""
     emissions = _emit(tmp_path, {"module.py": _SOURCE_F_VALUE}, {"module.py": _source_f_value_key()})
 
     assert len(emissions) == 1
@@ -747,7 +747,7 @@ def test_emission_contradiction_exception_exposed(tmp_path: Path) -> None:
     assert delta.field == "exception"
     assert delta.value == "KeyError:local"
     assert outcome.entry is not None
-    assert outcome.entry.severity == "warning"
+    assert outcome.entry.severity == "error"
     assert outcome.entry.code == DMT_4201
     assert outcome.meta is not None
     assert outcome.meta.provenance == "local"
@@ -1193,7 +1193,7 @@ def test_run_check_dia_enabled_by_default(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """DIA is enabled by default, while an inconclusive analysis emits no finding."""
+    """DIA is enabled by default, so impact_analysis is always set, including inconclusive results."""
     monkeypatch.setattr(
         runner,
         "discover_changed_python_files",
@@ -1675,7 +1675,7 @@ def test_demo_three_featured_cases(tmp_path: Path) -> None:
     assert dia_codes.count(DMT_4201) >= 3
 
     dia_errors = [check for check in outcome.checks if check.dia is not None and check.severity == "error"]
-    assert dia_errors == []
+    assert [check.symbol for check in dia_errors] == ["pricing.grille.unit_price"]
 
     dia_symbols = {check.symbol for check in outcome.checks if check.dia is not None}
     assert not any(symbol.endswith("_read_grid") for symbol in dia_symbols)
@@ -1823,7 +1823,7 @@ def test_exception_in_other_try_is_not_masked(tmp_path: Path) -> None:
     assert keyerror
     _, outcome = keyerror[0]
     assert outcome.entry is not None
-    assert outcome.entry.severity == "warning"
+    assert outcome.entry.severity == "error"
     assert outcome.impact is not None
     assert outcome.impact.status == "contradiction"
 
