@@ -51,6 +51,13 @@ def _commit(tmp_path: Path, message: str) -> None:
     _git(tmp_path, "commit", "-m", message)
 
 
+def test_cli_defaults_project_to_current_directory() -> None:
+    """The CLI uses the current directory when no project path is provided."""
+    args = cli.create_parser().parse_args([])
+
+    assert args.project == Path()
+
+
 def test_github_format_produces_annotations() -> None:
     """The GitHub formatter converts checks into workflow commands."""
     outcome = CheckResult()

@@ -118,14 +118,17 @@ On Windows, activate the environment with `.venv\Scripts\Activate.ps1`.
 Check local changes since `HEAD`:
 
 ```bash
-python -m docmethis_check .
+python -m docmethis_check
 ```
+
+The project path defaults to the current directory. Pass a directory explicitly
+when checking another project.
 
 By default, Check writes a short human-readable report to stdout. Use
 `--format json` when a script or remediation tool needs the canonical report:
 
 ```bash
-python -m docmethis_check . --format json
+python -m docmethis_check --format json
 ```
 
 To check an explicit range and save both integration outputs:

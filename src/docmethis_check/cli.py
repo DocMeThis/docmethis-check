@@ -38,7 +38,9 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "project",
         type=Path,
-        help="Path to the Python project to analyze",
+        nargs="?",
+        default=Path(),
+        help="Path to the Python project to analyze (default: current directory)",
     )
     diff_group = parser.add_argument_group("Git diff and base handling")
     diff_group.add_argument(
