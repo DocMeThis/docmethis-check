@@ -16,7 +16,7 @@ dia_exclude_paths=""
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --project-path)
-      project_path="${2:?--project-path attend une valeur}"
+      project_path="${2:?--project-path requires a value}"
       shift 2
       ;;
     --fail-on-warning)
@@ -60,7 +60,7 @@ while [ "$#" -gt 0 ]; do
       shift 2
       ;;
     *)
-      echo "Argument inconnu: $1" >&2
+      echo "Unknown argument: $1" >&2
       exit 2
       ;;
   esac

@@ -1,40 +1,40 @@
 name: "Docstring Check"
-description: "Vérifie la cohérence docstring/code sur les changements"
+description: "Checks docstring/code consistency on changes"
 
 inputs:
   project-path:
-    description: "Chemin du projet à checker"
+    description: "Path to the project to check"
     required: false
     default: "."
   fail-on-warning:
-    description: "Fait échouer le check si au moins un warning est émis. true/false force ; vide = valeur par défaut."
+    description: "Fail the check when at least one warning is emitted. true/false forces a value; empty uses the default."
     required: false
   include-visibility:
-    description: "Visibilités à checker, séparées par des virgules"
+    description: "Visibilities to check, comma-separated"
     required: false
   profile:
-    description: "Profil de sévérité intégré; vide = configuration pyproject.toml"
+    description: "Built-in severity profile; empty uses the pyproject.toml configuration"
     required: false
   base-ref:
-    description: "Branche de référence pour le calcul du diff (ex: main)"
+    description: "Reference branch used to calculate the diff (for example, main)"
     required: false
   on-missing-base:
-    description: "Comportement si le snapshot Git d'un fichier de base est indisponible après résolution du diff : emit_all ou fail. Vide = valeur par défaut."
+    description: "Behavior when a changed file's base Git snapshot is unavailable after diff resolution: emit_all or fail. Empty uses the default."
     required: false
   on-nonlinear-push-without-base:
-    description: "Comportement en cas de push non linéaire sans base-ref configurée : fail, head_commit ou warn. Vide = valeur par défaut."
+    description: "Behavior for a non-linear push without a configured base-ref: fail, head_commit, or warn. Empty uses the default."
     required: false
   check-mode:
-    description: "Mode de vérification : regression ou catchup. Vide = valeur par défaut (regression)."
+    description: "Check mode: regression or catchup. Empty uses the default (regression)."
     required: false
   annotation-placement:
-    description: "Placement des annotations : signature, docstring, precise. Vide = valeur par défaut (signature)."
+    description: "Annotation placement: signature, docstring, or precise. Empty uses the default (signature)."
     required: false
   exclude-paths:
-    description: "Fichiers ou répertoires relatifs à exclure de Check et DIA, séparés par des virgules. Vide = pyproject.toml."
+    description: "Project-relative files or directories to exclude from Check and DIA, comma-separated. Empty uses pyproject.toml."
     required: false
   dia-exclude-paths:
-    description: "Fichiers ou répertoires relatifs à exclure de DIA uniquement, séparés par des virgules. Vide = pyproject.toml."
+    description: "Project-relative files or directories to exclude from DIA only, comma-separated. Empty uses pyproject.toml."
     required: false
 
 runs:
