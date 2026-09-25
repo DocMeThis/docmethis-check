@@ -237,7 +237,7 @@ class CheckConfig:
     annotation_placement : AnnotationPlacement
         Where type annotations are placed in generated documentation.
     on_missing_base : OnMissingBase
-        Behavior when the base revision is unavailable.
+        Behavior when a changed file's base snapshot is unavailable during regression filtering.
     dia : bool
         Whether diagnostic annotations are enabled.
     forbidden_terms : tuple[str, ...]
@@ -409,9 +409,10 @@ def load_check_config(  # noqa: C901, PLR0913
         value raises a ``ValueError``. If ``None`` (the default), the configuration loaded from ``pyproject.toml`` is used without
         modification.
     on_missing_base : str | None = None
-        Determines the action to take when a base symbol is missing during documentation checks. When provided, this value
-        overrides the setting loaded from ``pyproject.toml`` by normalizing the given string to a member of the ``OnMissingBase``
-        enum. If not provided, the default value from the configuration file or ``OnMissingBase.EMIT_ALL`` is used.
+        Determines the action to take when a changed file's base snapshot cannot be read during regression filtering. When
+        provided, this value overrides the setting loaded from ``pyproject.toml`` by normalizing the given string to a member of
+        the ``OnMissingBase`` enum. If not provided, the default value from the configuration file or
+        ``OnMissingBase.EMIT_ALL`` is used.
     method_exception_contract : str | None = None
         Selects whether class-method exceptions are documented on each callable or in a class-level aggregate. When ``None``, the
         value from ``pyproject.toml`` is used.

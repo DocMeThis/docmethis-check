@@ -18,6 +18,9 @@ inputs:
   base-ref:
     description: "Branche de référence pour le calcul du diff (ex: main)"
     required: false
+  on-missing-base:
+    description: "Comportement si le snapshot Git d'un fichier de base est indisponible après résolution du diff : emit_all ou fail. Vide = valeur par défaut."
+    required: false
   on-nonlinear-push-without-base:
     description: "Comportement en cas de push non linéaire sans base-ref configurée : fail, head_commit ou warn. Vide = valeur par défaut."
     required: false
@@ -26,9 +29,6 @@ inputs:
     required: false
   annotation-placement:
     description: "Placement des annotations : signature, docstring, precise. Vide = valeur par défaut (signature)."
-    required: false
-  on-missing-base:
-    description: "Comportement si base indisponible : emit_all ou fail. Vide = valeur par défaut (emit_all)."
     required: false
   exclude-paths:
     description: "Fichiers ou répertoires relatifs à exclure de Check et DIA, séparés par des virgules. Vide = pyproject.toml."
@@ -51,14 +51,14 @@ runs:
     - "${{ inputs.profile }}"
     - "--base-ref"
     - "${{ inputs.base-ref }}"
+    - "--on-missing-base"
+    - "${{ inputs.on-missing-base }}"
     - "--on-nonlinear-push-without-base"
     - "${{ inputs.on-nonlinear-push-without-base }}"
     - "--check-mode"
     - "${{ inputs.check-mode }}"
     - "--annotation-placement"
     - "${{ inputs.annotation-placement }}"
-    - "--on-missing-base"
-    - "${{ inputs.on-missing-base }}"
     - "--exclude-paths"
     - "${{ inputs.exclude-paths }}"
     - "--dia-exclude-paths"

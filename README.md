@@ -201,6 +201,22 @@ does not turn every PR into a repository-wide documentation audit. Use the
 empty-tree `catchup` command above for a one-time audit of an existing
 repository.
 
+## Git Diff And Base Handling
+
+These options control which Git range Check analyzes and how it handles base
+context:
+
+- `base-ref`: base branch used when a push is non-linear.
+- `git-diff`: explicit Git range; without it, Check uses local changes since `HEAD`.
+- `on-missing-base`: behavior when a valid range is available but a changed file's base snapshot cannot be read. `emit_all` keeps
+  current diagnostics and `fail` stops the run.
+- `on-nonlinear-push-without-base`: behavior when a non-linear push has no reliable base: `fail`, `head_commit`, or `warn`.
+
+`on-missing-base` does not make an invalid Git range usable. A missing or
+invalid revision fails while the diff is being resolved, before base snapshot
+fallback is considered. A newly added file is treated as having an empty base
+and is not considered an unavailable snapshot.
+
 ## Configuration
 
 Add policy to the target project's `pyproject.toml`. The repository's
@@ -242,9 +258,7 @@ Useful policy choices:
 - `property-accessors`: `getter`, `setter` (both by default); `[]` disables
   property accessor checks without disabling normal methods.
 - `annotation-placement`: `signature`, `docstring`, `precise`.
-- `on-missing-base`: `emit_all` or `fail`.
 - `method-exception-contract`: `callable` (default) or `class_aggregate`.
-- `on-nonlinear-push-without-base`: `fail`, `head_commit`, or `warn`.
 - `exclude-paths`: project-relative files or directory prefixes excluded from Check and DIA.
 - `dia-exclude-paths`: project-relative files or directory prefixes excluded from DIA only.
 
@@ -252,11 +266,6 @@ Path filters use exact paths or directory prefixes, not glob patterns. For examp
 `dia-exclude-paths = ["tests"]` keeps direct documentation checks enabled for
 tests while suppressing DIA findings on test paths. Excluded files remain
 available as analysis context for other files.
-
-When regression filtering cannot retrieve a file's base snapshot, `emit_all`
-reports the current diagnostics without subtracting historical findings, while
-`fail` stops the check. A file added by the change is treated as having an empty
-base and is not considered an unavailable snapshot.
 
 ## Diagnostic Codes
 
