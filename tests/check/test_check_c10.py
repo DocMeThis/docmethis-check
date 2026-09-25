@@ -1283,7 +1283,12 @@ def test_github_block_public_contract_diff(tmp_path: Path) -> None:
                     "aspect": "return_changed",
                     "before": "int",
                     "after": "str",
-                }
+                },
+                {
+                    "symbol": "module.f",
+                    "aspect": "parameter_added",
+                    "parameter": "exclude_paths",
+                },
             ],
         ),
         checks=[
@@ -1329,6 +1334,7 @@ def test_github_block_public_contract_diff(tmp_path: Path) -> None:
     assert "Public Contract Diff" in output
     assert "observed" in output
     assert "return_changed (int -> str)" in output
+    assert "parameter_added (exclude_paths)" in output
     assert "doc=inherited" in output
     assert "contract=module.Base.run" in output
 

@@ -99,7 +99,6 @@ symbol_kinds = ["function", "method", "class", "module"]
 property_accessors = ["getter", "setter"]
 dia = true
 exclude_paths = ["tests"]
-dia_exclude_paths = ["tests"]
 profile = "strict"
 
 [tool.docmethis.fix]
