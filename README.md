@@ -239,7 +239,8 @@ Useful policy choices:
 
 - `include-visibility`: `public`, `protected`, `private`.
 - `symbol-kinds`: `function`, `method`, `class`, `module`.
-- `property-accessors`: `getter`, `setter` (both by default).
+- `property-accessors`: `getter`, `setter` (both by default); `[]` disables
+  property accessor checks without disabling normal methods.
 - `annotation-placement`: `signature`, `docstring`, `precise`.
 - `on-missing-base`: `emit_all` or `fail`.
 - `method-exception-contract`: `callable` (default) or `class_aggregate`.

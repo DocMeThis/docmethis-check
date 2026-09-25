@@ -50,6 +50,7 @@ def test_config_reads_property_accessors_with_both_as_default(tmp_path: Path) ->
 
 def test_parse_property_accessors_validates_values() -> None:
     assert parse_property_accessors("getter,setter") == frozenset({PropertyAccessor.GETTER, PropertyAccessor.SETTER})
+    assert parse_property_accessors("") == frozenset()
 
     with pytest.raises(ValueError, match=r"property_accessors\[\].*'getter'.*'setter'"):
         parse_property_accessors("deleter")
@@ -59,13 +60,25 @@ def test_check_config_validates_property_accessors_directly() -> None:
     with pytest.raises(TypeError, match="property_accessors must contain only PropertyAccessor instances"):
         CheckConfig(property_accessors=frozenset({"getter"}))
 
-    with pytest.raises(ValueError, match="property_accessors must contain at least one accessor"):
-        CheckConfig(property_accessors=frozenset())
+    assert CheckConfig(property_accessors=frozenset()).property_accessors == frozenset()
+
+
+def test_config_allows_empty_property_accessors(tmp_path: Path) -> None:
+    """An empty TOML accessor list disables property accessor checks."""
+    (tmp_path / "pyproject.toml").write_text(
+        "[tool.docmethis.check]\nproperty-accessors = []\n",
+        encoding="utf-8",
+    )
+
+    assert load_check_config(tmp_path).property_accessors == frozenset()
 
 
 def test_parse_symbol_kinds_uses_enum_normalization() -> None:
     """Parsing symbol kinds reuses the shared enum helper."""
     assert parse_symbol_kinds("class,module") == frozenset({SymbolKind.CLASS, SymbolKind.MODULE})
+
+    with pytest.raises(ValueError, match="symbol_kinds must contain at least one symbol kind"):
+        parse_symbol_kinds("")
 
     with pytest.raises(ValueError, match=r"symbol_kinds\[\].*'function'.*'module'"):
         parse_symbol_kinds("service")

@@ -327,9 +327,6 @@ class CheckConfig:
             container=frozenset,
             field="property_accessors",
         )
-        if not self.property_accessors:
-            msg = "property_accessors must contain at least one accessor."
-            raise ValueError(msg)
 
         if self.check_mode == CheckMode.SURVEY:
             msg = "check_mode='survey' is not implemented yet. Supported values: regression, catchup."
@@ -627,9 +624,6 @@ def parse_symbol_kinds(value: str) -> frozenset[SymbolKind]:
 def parse_property_accessors(value: str) -> frozenset[PropertyAccessor]:
     """Parse a comma-separated list of property accessor roles."""
     names = [name.strip() for name in value.split(",") if name.strip()]
-    if not names:
-        msg = "property_accessors must contain at least one accessor."
-        raise ValueError(msg)
 
     return frozenset(
         normalize_str_enum_value(value=name, enum_type=PropertyAccessor, field="property_accessors[]") for name in names
@@ -901,17 +895,9 @@ def _read_property_accessors(section: dict[str, object]) -> frozenset[PropertyAc
     frozenset[PropertyAccessor]
         Configured property accessor roles.
 
-    Raises
-    ------
-    ValueError
-        If the list is empty or contains an unsupported accessor.
-
     """
     value = section.get("property-accessors", [PropertyAccessor.GETTER.value, PropertyAccessor.SETTER.value])
     type_check(value=value, expected_alias_type=StrictListOfStrictStr, field="tool.docmethis.check.property-accessors")
-    if not value:
-        msg = "tool.docmethis.check.property-accessors must contain at least one accessor."
-        raise ValueError(msg)
     return frozenset(
         normalize_str_enum_value(value=item, enum_type=PropertyAccessor, field="tool.docmethis.check.property-accessors[]")
         for item in value
