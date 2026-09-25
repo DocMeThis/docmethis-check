@@ -121,9 +121,14 @@ def _format_impact_analysis(result: CheckResult) -> list[str]:
         for impact in changed_unverified_impacts
     )
     for change in analysis.api_diff:
-        before = change.get("before")
-        after = change.get("after")
-        content.append(f"- {change['symbol']}: {change['aspect']} ({before} -> {after})")
+        label = str(change["aspect"])
+        if (parameter := change.get("parameter")) is not None:
+            label = f"{label} ({parameter})"
+        if "before" in change or "after" in change:
+            before = change.get("before", "absent")
+            after = change.get("after", "absent")
+            label = f"{label} ({before} -> {after})"
+        content.append(f"- {change['symbol']}: {label}")
 
     return [f"::notice title=DocMeThis DIA::{_escape_message(chr(10).join(content))}"]
 
