@@ -48,12 +48,12 @@ class AnnotationPlacement(StrEnum):
 
 
 class OnMissingBase(StrEnum):
-    """Behavior when the base revision is unavailable.
+    """Behavior when a changed file's base snapshot is unavailable during regression filtering.
 
     Attributes
     ----------
     EMIT_ALL : str
-        Emit diagnostics for all symbols.
+        Emit current diagnostics without base regression filtering.
     FAIL : str
         Fail the check run.
 

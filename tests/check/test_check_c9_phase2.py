@@ -52,7 +52,8 @@ def _result(tmp_path: Path) -> CheckResult:
 
 def test_help_exposes_c9_output_options() -> None:
     """The live CLI help documents the new output controls."""
-    help_text = " ".join(cli.create_parser().format_help().split())
+    raw_help = cli.create_parser().format_help()
+    help_text = " ".join(raw_help.split())
 
     assert "--format {text,json}" in help_text
     assert "--verbose" in help_text
@@ -68,6 +69,59 @@ def test_help_exposes_c9_output_options() -> None:
     assert "default: callable" in help_text
     assert "empty disables accessor checks" in help_text
     assert "default: enabled" in help_text
+
+    assert "Git diff and base handling:" in raw_help
+    assert "Output and execution:" in raw_help
+    assert "Check policy:" in raw_help
+
+    git_help = raw_help.split("Git diff and base handling:", 1)[1].split("Output and execution:", 1)[0]
+    assert [
+        git_help.index(option) for option in ("--base-ref", "--git-diff", "--on-missing-base", "--on-nonlinear-push-without-base")
+    ] == sorted(
+        git_help.index(option) for option in ("--base-ref", "--git-diff", "--on-missing-base", "--on-nonlinear-push-without-base")
+    )
+
+    output_help = raw_help.split("Output and execution:", 1)[1].split("Check policy:", 1)[0]
+    assert [
+        output_help.index(option)
+        for option in ("--ascii", "--color", "--format", "--github-output-file", "--json-output-file", "--no-cache", "--verbose")
+    ] == sorted(
+        output_help.index(option)
+        for option in ("--ascii", "--color", "--format", "--github-output-file", "--json-output-file", "--no-cache", "--verbose")
+    )
+
+    policy_help = raw_help.split("Check policy:", 1)[1]
+    assert [
+        policy_help.index(option)
+        for option in (
+            "--annotation-placement",
+            "--check-mode",
+            "--dia",
+            "--dia-exclude-paths",
+            "--exclude-paths",
+            "--fail-on-warning",
+            "--include-visibility",
+            "--method-exception-contract",
+            "--profile",
+            "--property-accessors",
+            "--symbol-kinds",
+        )
+    ] == sorted(
+        policy_help.index(option)
+        for option in (
+            "--annotation-placement",
+            "--check-mode",
+            "--dia",
+            "--dia-exclude-paths",
+            "--exclude-paths",
+            "--fail-on-warning",
+            "--include-visibility",
+            "--method-exception-contract",
+            "--profile",
+            "--property-accessors",
+            "--symbol-kinds",
+        )
+    )
 
 
 def test_cli_json_is_identical_to_the_canonical_formatter(

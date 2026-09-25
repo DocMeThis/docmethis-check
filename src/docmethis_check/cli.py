@@ -27,9 +27,8 @@ def create_parser() -> argparse.ArgumentParser:
     Returns
     -------
     argparse.ArgumentParser
-        The configured command-line argument parser for the docmethis_check tool, including all defined options for project path,
-        output files, git diff range, cache control, warning behavior, visibility and symbol kind filters, verification modes,
-        annotation placement, missing base handling, method exception ownership, and documentation impact analysis settings.
+        The configured command-line argument parser for the docmethis_check tool, including grouped options for Git diff and base
+        handling, output and execution, and Check policy.
 
     """
     parser = argparse.ArgumentParser(
@@ -41,68 +40,118 @@ def create_parser() -> argparse.ArgumentParser:
         type=Path,
         help="Path to the Python project to analyze",
     )
-    parser.add_argument(
-        "--github-output-file",
-        type=Path,
-        default=None,
-        help="GitHub annotations output file (default: none)",
-    )
-    parser.add_argument(
-        "--json-output-file",
-        type=Path,
-        default=None,
-        help="Canonical JSON report output file (default: none)",
-    )
-    parser.add_argument(
-        "--format",
-        choices=("text", "json"),
-        default="text",
-        help="Stdout report format: text (default) or json; ignored when an output file is set",
-    )
-    parser.add_argument(
-        "--verbose",
-        action="store_true",
-        help="Include additional metadata in text output (default: disabled)",
-    )
-    parser.add_argument(
-        "--color",
-        choices=("auto", "never", "always"),
-        default="auto",
-        help="Color text output: auto (default), never, or always",
-    )
-    parser.add_argument(
-        "--ascii",
-        action="store_true",
-        dest="ascii_mode",
-        help="Use ASCII-only tree and separator glyphs (default: Unicode layout)",
-    )
-    parser.add_argument(
-        "--git-diff",
-        type=str,
-        default=None,
-        help="Git range to analyze (default: local changes since HEAD)",
-    )
-    parser.add_argument(
-        "--no-cache",
-        action="store_true",
-        help="Disable writing .docmethis_cache.json for this run (default: cache enabled)",
-    )
-    # For configuration-backed options below, None means no CLI override:
-    # the project setting wins when present; otherwise the built-in default applies.
-    parser.add_argument(
+    diff_group = parser.add_argument_group("Git diff and base handling")
+    diff_group.add_argument(
         "--base-ref",
         type=str,
         default=None,
         help="Base branch for non-linear pushes (default: unset)",
     )
-    parser.add_argument(
+    diff_group.add_argument(
+        "--git-diff",
+        type=str,
+        default=None,
+        help="Git range to analyze (default: local changes since HEAD)",
+    )
+    diff_group.add_argument(
+        "--on-missing-base",
+        type=str,
+        default=None,
+        choices=("fail", "emit_all"),
+        help="Behavior when a valid range cannot provide a file base snapshot: emit_all or fail (default: emit_all)",
+    )
+    diff_group.add_argument(
         "--on-nonlinear-push-without-base",
         type=str,
         default=None,
         choices=("fail", "head_commit", "warn"),
         help=("Behavior for a non-linear push without a base: fail, head_commit, or warn (default: fail)"),
     )
-    warning_group = parser.add_mutually_exclusive_group()
+
+    output_group = parser.add_argument_group("Output and execution")
+    output_group.add_argument(
+        "--ascii",
+        action="store_true",
+        dest="ascii_mode",
+        help="Use ASCII-only tree and separator glyphs (default: Unicode layout)",
+    )
+    output_group.add_argument(
+        "--color",
+        choices=("auto", "never", "always"),
+        default="auto",
+        help="Color text output: auto (default), never, or always",
+    )
+    output_group.add_argument(
+        "--format",
+        choices=("text", "json"),
+        default="text",
+        help="Stdout report format: text (default) or json; ignored when an output file is set",
+    )
+    output_group.add_argument(
+        "--github-output-file",
+        type=Path,
+        default=None,
+        help="GitHub annotations output file (default: none)",
+    )
+    output_group.add_argument(
+        "--json-output-file",
+        type=Path,
+        default=None,
+        help="Canonical JSON report output file (default: none)",
+    )
+    output_group.add_argument(
+        "--no-cache",
+        action="store_true",
+        help="Disable writing .docmethis_cache.json for this run (default: cache enabled)",
+    )
+    output_group.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Include additional metadata in text output (default: disabled)",
+    )
+
+    policy_group = parser.add_argument_group("Check policy")
+    policy_group.add_argument(
+        "--annotation-placement",
+        type=str,
+        default=None,
+        choices=("signature", "docstring", "precise"),
+        help="Annotation placement: signature, docstring, precise (default: signature)",
+    )
+    policy_group.add_argument(
+        "--check-mode",
+        type=str,
+        default=None,
+        choices=("regression", "catchup"),
+        help="Verification mode: regression or catchup (default: regression)",
+    )
+    dia_group = policy_group.add_mutually_exclusive_group()
+    dia_group.add_argument(
+        "--dia",
+        dest="dia",
+        action="store_true",
+        default=None,
+        help=("Enable documentation impact analysis (DIA): BASE→HEAD model and impact_analysis (default: enabled)"),
+    )
+    dia_group.add_argument(
+        "--no-dia",
+        dest="dia",
+        action="store_false",
+        help="Disable DIA (overrides the configured default)",
+    )
+    policy_group.add_argument(
+        "--dia-exclude-paths",
+        type=str,
+        default=None,
+        help="Project-relative files or directories to exclude from DIA only, comma-separated (default: configuration)",
+    )
+    policy_group.add_argument(
+        "--exclude-paths",
+        type=str,
+        default=None,
+        help="Project-relative files or directories to exclude from Check and DIA, comma-separated (default: configuration)",
+    )
+    warning_group = policy_group.add_mutually_exclusive_group()
     warning_group.add_argument(
         "--fail-on-warning",
         dest="fail_on_warning",
@@ -116,19 +165,27 @@ def create_parser() -> argparse.ArgumentParser:
         action="store_false",
         help="Do not fail on warnings, even if enabled by pyproject.toml (default: not selected)",
     )
-    parser.add_argument(
+    policy_group.add_argument(
         "--include-visibility",
         type=str,
         default=None,
         help="Visibilities to check, comma-separated: public,protected,private (default: public only)",
     )
-    parser.add_argument(
-        "--symbol-kinds",
+    policy_group.add_argument(
+        "--method-exception-contract",
         type=str,
         default=None,
-        help=("Symbol kinds to check, comma-separated: function,method,class,module (default: function,method,class)"),
+        choices=("callable", "class_aggregate"),
+        help="Exception documentation owner: callable or class_aggregate (default: callable)",
     )
-    parser.add_argument(
+    policy_group.add_argument(
+        "--profile",
+        type=str,
+        choices=("loose", "standard", "strict"),
+        default=None,
+        help=("Built-in severity policy: loose, standard, or strict (default: standard); explicit per-code overrides still win"),
+    )
+    policy_group.add_argument(
         "--property-accessors",
         type=str,
         default=None,
@@ -136,66 +193,11 @@ def create_parser() -> argparse.ArgumentParser:
             "Property accessors to check, comma-separated: getter,setter; empty disables accessor checks (default: getter,setter)"
         ),
     )
-    parser.add_argument(
-        "--exclude-paths",
+    policy_group.add_argument(
+        "--symbol-kinds",
         type=str,
         default=None,
-        help="Project-relative files or directories to exclude from Check and DIA, comma-separated (default: configuration)",
-    )
-    parser.add_argument(
-        "--dia-exclude-paths",
-        type=str,
-        default=None,
-        help="Project-relative files or directories to exclude from DIA only, comma-separated (default: configuration)",
-    )
-    parser.add_argument(
-        "--profile",
-        type=str,
-        choices=("loose", "standard", "strict"),
-        default=None,
-        help=("Built-in severity policy: loose, standard, or strict (default: standard); explicit per-code overrides still win"),
-    )
-    parser.add_argument(
-        "--check-mode",
-        type=str,
-        default=None,
-        choices=("regression", "catchup"),
-        help="Verification mode: regression or catchup (default: regression)",
-    )
-    parser.add_argument(
-        "--annotation-placement",
-        type=str,
-        default=None,
-        choices=("signature", "docstring", "precise"),
-        help="Annotation placement: signature, docstring, precise (default: signature)",
-    )
-    parser.add_argument(
-        "--on-missing-base",
-        type=str,
-        default=None,
-        choices=("fail", "emit_all"),
-        help="Behavior when the base is unavailable: emit_all or fail (default: emit_all)",
-    )
-    parser.add_argument(
-        "--method-exception-contract",
-        type=str,
-        default=None,
-        choices=("callable", "class_aggregate"),
-        help="Exception documentation owner: callable or class_aggregate (default: callable)",
-    )
-    dia_group = parser.add_mutually_exclusive_group()
-    dia_group.add_argument(
-        "--dia",
-        dest="dia",
-        action="store_true",
-        default=None,
-        help=("Enable documentation impact analysis (DIA): BASE→HEAD model and impact_analysis (default: enabled)"),
-    )
-    dia_group.add_argument(
-        "--no-dia",
-        dest="dia",
-        action="store_false",
-        help="Disable DIA (overrides the configured default)",
+        help=("Symbol kinds to check, comma-separated: function,method,class,module (default: function,method,class)"),
     )
     return parser
 
