@@ -37,6 +37,25 @@ __all__ = [
 ]
 
 _SECTION_CHECK = ("tool", "docmethis", "check")
+_CHECK_OPTION_KEYS = frozenset(
+    {
+        "annotation-placement",
+        "base-ref",
+        "check-mode",
+        "dia",
+        "dia-exclude-paths",
+        "exclude-paths",
+        "fail-on-warning",
+        "include-visibility",
+        "method-exception-contract",
+        "on-missing-base",
+        "on-nonlinear-push-without-base",
+        "profile",
+        "property-accessors",
+        "severity",
+        "symbol-kinds",
+    }
+)
 _VISIBILITIES_BY_NAME = {visibility.value: visibility for visibility in Visibility}
 _VALID_SEVERITIES = {"error", "warning", "disabled"}
 _FORBIDDEN_TERMS_FILE = Path("config/forbidden_terms.txt")
@@ -419,31 +438,32 @@ def load_check_config(  # noqa: C901, PLR0913
     root = Path(project_root).resolve()
     data = _read_pyproject(root / "pyproject.toml")
     section = _check_section(data)
+    _validate_check_keys(section)
 
     config = CheckConfig(
-        fail_on_warning=_read_bool(section, "fail_on_warning", default=False),
+        fail_on_warning=_read_bool(section, "fail-on-warning", default=False),
         include_visibility=_read_include_visibility(section),
         symbol_kinds=_read_symbol_kinds(section),
         property_accessors=_read_property_accessors(section),
         severity=_read_severities(section),
         profile=_read_profile(section),
-        base_ref=_read_str(section, "base_ref"),
-        on_nonlinear_push_without_base=_read_str(section, "on_nonlinear_push_without_base", default="fail"),
+        base_ref=_read_str(section, "base-ref"),
+        on_nonlinear_push_without_base=_read_str(section, "on-nonlinear-push-without-base", default="fail"),
         check_mode=_read_check_mode(section),
         annotation_placement=_read_enum(
-            section, "annotation_placement", enum_type=AnnotationPlacement, default=AnnotationPlacement.SIGNATURE
+            section, "annotation-placement", enum_type=AnnotationPlacement, default=AnnotationPlacement.SIGNATURE
         ),
-        on_missing_base=_read_enum(section, "on_missing_base", enum_type=OnMissingBase, default=OnMissingBase.EMIT_ALL),
+        on_missing_base=_read_enum(section, "on-missing-base", enum_type=OnMissingBase, default=OnMissingBase.EMIT_ALL),
         method_exception_contract=_read_enum(
             section,
-            "method_exception_contract",
+            "method-exception-contract",
             enum_type=MethodExceptionContract,
             default=MethodExceptionContract.CALLABLE,
         ),
         dia=_read_bool(section, "dia", default=True),
         forbidden_terms=_load_forbidden_terms(root),
-        exclude_paths=_read_path_filters(section, "exclude_paths"),
-        dia_exclude_paths=_read_path_filters(section, "dia_exclude_paths"),
+        exclude_paths=_read_path_filters(section, "exclude-paths"),
+        dia_exclude_paths=_read_path_filters(section, "dia-exclude-paths"),
     )
 
     if fail_on_warning is not None:
@@ -482,7 +502,7 @@ def load_check_config(  # noqa: C901, PLR0913
             method_exception_contract=normalize_str_enum_value(
                 value=method_exception_contract,
                 enum_type=MethodExceptionContract,
-                field="tool.docmethis.check.method_exception_contract",
+                field="tool.docmethis.check.method-exception-contract",
             ),
         )
 
@@ -664,6 +684,27 @@ def _check_section(data: dict[str, object]) -> dict[str, object]:
     return section
 
 
+def _validate_check_keys(section: dict[str, object]) -> None:
+    """Reject unknown or non-canonical Check configuration keys.
+
+    Parameters
+    ----------
+    section : dict[str, object]
+        Direct values from the ``tool.docmethis.check`` TOML table.
+
+    Raises
+    ------
+    ValueError
+        If the table contains an unsupported option name.
+
+    """
+    unknown = sorted(set(section) - _CHECK_OPTION_KEYS)
+    if unknown:
+        names = ", ".join(unknown)
+        msg = f"Unknown tool.docmethis.check option(s): {names}. Use kebab-case option names."
+        raise ValueError(msg)
+
+
 def _read_str(section: dict[str, object], key: str, *, default: str | None = None) -> str | None:
     """Read a configuration string or return the default.
 
@@ -746,7 +787,7 @@ def _read_check_mode(section: dict[str, object]) -> CheckMode:
     ----------
     section : dict[str, object]
         The ``section`` parameter is a dictionary mapping configuration keys to their associated values, from which the check mode
-        is read. The function looks up the ``"check_mode"`` key within this dictionary to determine the desired mode, defaulting
+        is read. The function looks up the ``"check-mode"`` key within this dictionary to determine the desired mode, defaulting
         to the value of ``CheckMode.REGRESSION`` if the key is not present.
 
     Returns
@@ -756,7 +797,7 @@ def _read_check_mode(section: dict[str, object]) -> CheckMode:
         normalizes it into a CheckMode instance while rejecting any unsupported modes.
 
     """
-    value = section.get("check_mode", CheckMode.REGRESSION.value)
+    value = section.get("check-mode", CheckMode.REGRESSION.value)
     return _normalize_check_mode(value)
 
 
@@ -772,10 +813,10 @@ def _normalize_check_mode(value: object) -> CheckMode:
     -------
     CheckMode
         Normalize the given value into a valid CheckMode enum member supported by the current execution environment, using the
-        configuration field 'tool.docmethis.check.check_mode' for reference.
+        configuration field 'tool.docmethis.check.check-mode' for reference.
 
     """
-    return normalize_str_enum_value(value=value, enum_type=CheckMode, field="tool.docmethis.check.check_mode")
+    return normalize_str_enum_value(value=value, enum_type=CheckMode, field="tool.docmethis.check.check-mode")
 
 
 def _read_include_visibility(section: dict[str, object]) -> frozenset[Visibility]:
@@ -785,7 +826,7 @@ def _read_include_visibility(section: dict[str, object]) -> frozenset[Visibility
     ----------
     section : dict[str, object]
         A dictionary representing the configuration section from which the visibilities to include in the check are read. It is
-        expected to contain a key ``include_visibility`` whose value is a list of strings corresponding to visibility names; if
+        expected to contain a key ``include-visibility`` whose value is a list of strings corresponding to visibility names; if
         absent, it defaults to including only public visibility.
 
     Returns
@@ -800,12 +841,12 @@ def _read_include_visibility(section: dict[str, object]) -> frozenset[Visibility
         Explicitly raised.
 
     """
-    value = section.get("include_visibility", [Visibility.PUBLIC.value])
+    value = section.get("include-visibility", [Visibility.PUBLIC.value])
     if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
-        msg = "tool.docmethis.check.include_visibility must be a list of strings."
+        msg = "tool.docmethis.check.include-visibility must be a list of strings."
         raise ValueError(msg)
     if not value:
-        msg = "tool.docmethis.check.include_visibility must contain at least one visibility."
+        msg = "tool.docmethis.check.include-visibility must contain at least one visibility."
         raise ValueError(msg)
     return frozenset(_visibility_from_name(item) for item in value)
 
@@ -817,14 +858,14 @@ def _read_symbol_kinds(section: dict[str, object]) -> frozenset[SymbolKind]:
     ----------
     section : dict[str, object]
         The configuration section from the project's tool settings that contains the symbol kinds to be checked. This dictionary
-        may include a 'symbol_kinds' entry whose value is a list of strings representing the desired SymbolKind values; if absent,
+        may include a 'symbol-kinds' entry whose value is a list of strings representing the desired SymbolKind values; if absent,
         the function defaults to including function, method, and class symbol kinds. The function validates that the provided
         value is a non-empty list of strings and converts each entry into its corresponding SymbolKind enum member.
 
     Returns
     -------
     frozenset[SymbolKind]
-        A frozenset of SymbolKind values representing the symbol kinds to include in the check, parsed from the 'symbol_kinds'
+        A frozenset of SymbolKind values representing the symbol kinds to include in the check, parsed from the 'symbol-kinds'
         entry in the configuration section. If the entry is absent, it defaults to function, method, and class symbol kinds. Each
         string value is validated and converted to its corresponding SymbolKind enum member.
 
@@ -835,27 +876,44 @@ def _read_symbol_kinds(section: dict[str, object]) -> frozenset[SymbolKind]:
 
     """
     value = section.get(
-        "symbol_kinds",
+        "symbol-kinds",
         [SymbolKind.FUNCTION.value, SymbolKind.METHOD.value, SymbolKind.CLASS.value],
     )
-    type_check(value=value, expected_alias_type=StrictListOfStrictStr, field="tool.docmethis.check.symbol_kinds")
+    type_check(value=value, expected_alias_type=StrictListOfStrictStr, field="tool.docmethis.check.symbol-kinds")
     if not value:
-        msg = "tool.docmethis.check.symbol_kinds must contain at least one symbol kind."
+        msg = "tool.docmethis.check.symbol-kinds must contain at least one symbol kind."
         raise ValueError(msg)
     return frozenset(
-        normalize_str_enum_value(value=item, enum_type=SymbolKind, field="tool.docmethis.check.symbol_kinds[]") for item in value
+        normalize_str_enum_value(value=item, enum_type=SymbolKind, field="tool.docmethis.check.symbol-kinds[]") for item in value
     )
 
 
 def _read_property_accessors(section: dict[str, object]) -> frozenset[PropertyAccessor]:
-    """Read the property accessor roles included in the check."""
-    value = section.get("property_accessors", [PropertyAccessor.GETTER.value, PropertyAccessor.SETTER.value])
-    type_check(value=value, expected_alias_type=StrictListOfStrictStr, field="tool.docmethis.check.property_accessors")
+    """Read the property accessor roles included in the check.
+
+    Parameters
+    ----------
+    section : dict[str, object]
+        Configuration section containing the ``property-accessors`` value.
+
+    Returns
+    -------
+    frozenset[PropertyAccessor]
+        Configured property accessor roles.
+
+    Raises
+    ------
+    ValueError
+        If the list is empty or contains an unsupported accessor.
+
+    """
+    value = section.get("property-accessors", [PropertyAccessor.GETTER.value, PropertyAccessor.SETTER.value])
+    type_check(value=value, expected_alias_type=StrictListOfStrictStr, field="tool.docmethis.check.property-accessors")
     if not value:
-        msg = "tool.docmethis.check.property_accessors must contain at least one accessor."
+        msg = "tool.docmethis.check.property-accessors must contain at least one accessor."
         raise ValueError(msg)
     return frozenset(
-        normalize_str_enum_value(value=item, enum_type=PropertyAccessor, field="tool.docmethis.check.property_accessors[]")
+        normalize_str_enum_value(value=item, enum_type=PropertyAccessor, field="tool.docmethis.check.property-accessors[]")
         for item in value
     )
 

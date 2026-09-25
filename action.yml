@@ -19,7 +19,7 @@ inputs:
     description: "Branche de référence pour le calcul du diff (ex: main)"
     required: false
   on-nonlinear-push-without-base:
-    description: "Comportement en cas de push non linéaire sans base_ref configurée : fail, head_commit ou warn. Vide = valeur par défaut."
+    description: "Comportement en cas de push non linéaire sans base-ref configurée : fail, head_commit ou warn. Vide = valeur par défaut."
     required: false
   check-mode:
     description: "Mode de vérification : regression ou catchup. Vide = valeur par défaut (regression)."

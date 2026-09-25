@@ -220,8 +220,8 @@ profile = "standard"
 `loose` focuses on contract drift that can mislead readers, `standard` requires
 complete documentation contracts, and `strict` enables every current rule.
 Per-code values in `[tool.docmethis.check.severity]` override the selected
-profile. `include_visibility` remains orthogonal to the profile, and
-`check_mode` remains independent from severity.
+profile. `include-visibility` remains orthogonal to the profile, and
+`check-mode` remains independent from severity.
 
 Profiles are complete `code -> error | warning | disabled` policies, not just
 lists of enabled codes. `loose` keeps missing-docstring and presentation rules
@@ -237,18 +237,18 @@ option reference.
 
 Useful policy choices:
 
-- `include_visibility`: `public`, `protected`, `private`.
-- `symbol_kinds`: `function`, `method`, `class`, `module`.
-- `property_accessors`: `getter`, `setter` (both by default).
-- `annotation_placement`: `signature`, `docstring`, `precise`.
-- `on_missing_base`: `emit_all` or `fail`.
-- `method_exception_contract`: `callable` (default) or `class_aggregate`.
-- `on_nonlinear_push_without_base`: `fail`, `head_commit`, or `warn`.
-- `exclude_paths`: project-relative files or directory prefixes excluded from Check and DIA.
-- `dia_exclude_paths`: project-relative files or directory prefixes excluded from DIA only.
+- `include-visibility`: `public`, `protected`, `private`.
+- `symbol-kinds`: `function`, `method`, `class`, `module`.
+- `property-accessors`: `getter`, `setter` (both by default).
+- `annotation-placement`: `signature`, `docstring`, `precise`.
+- `on-missing-base`: `emit_all` or `fail`.
+- `method-exception-contract`: `callable` (default) or `class_aggregate`.
+- `on-nonlinear-push-without-base`: `fail`, `head_commit`, or `warn`.
+- `exclude-paths`: project-relative files or directory prefixes excluded from Check and DIA.
+- `dia-exclude-paths`: project-relative files or directory prefixes excluded from DIA only.
 
 Path filters use exact paths or directory prefixes, not glob patterns. For example,
-`dia_exclude_paths = ["tests"]` keeps direct documentation checks enabled for
+`dia-exclude-paths = ["tests"]` keeps direct documentation checks enabled for
 tests while suppressing DIA findings on test paths. Excluded files remain
 available as analysis context for other files.
 
@@ -265,7 +265,7 @@ a tool-independent, language-scoped registry. For the current Python
 implementation,
 `DMT-2001` maps to `TDV-PY-2001`: a parameter exists in the Python signature
 but is absent from the effective documentation.
-`DMT-4301` is emitted only with `method_exception_contract = "class_aggregate"`:
+`DMT-4301` is emitted only with `method-exception-contract = "class_aggregate"`:
 an exposed exception from covered methods is absent from the class `Raises` section.
 
 TDV defines what a violation means, not how to detect or handle it. Check

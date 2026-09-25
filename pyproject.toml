@@ -92,13 +92,13 @@ patterns = [
 ]
 
 [tool.docmethis.check]
-check_mode = "catchup"
-fail_on_warning = true
-include_visibility = ["public", "protected", "private"]
-symbol_kinds = ["function", "method", "class", "module"]
-property_accessors = ["getter", "setter"]
+check-mode = "catchup"
+fail-on-warning = true
+include-visibility = ["public", "protected", "private"]
+symbol-kinds = ["function", "method", "class", "module"]
+property-accessors = ["getter", "setter"]
 dia = true
-exclude_paths = ["tests"]
+exclude-paths = ["tests"]
 profile = "strict"
 
 [tool.docmethis.fix]

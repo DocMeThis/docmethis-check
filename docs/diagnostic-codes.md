@@ -23,7 +23,7 @@ These are the built-in Check profiles. `standard` is selected by default.
 - `disabled` means that the diagnostic is not reported.
 - **Fixable** uses `✓` when the registry marks the finding as suitable for an
   automatic documentation patch. `-` means that it is not marked fixable.
-- Whether a warning fails CI is controlled separately by `fail_on_warning`.
+- Whether a warning fails CI is controlled separately by `fail-on-warning`.
 - The intermediate headings follow the official TDV-PY top-level headings. They
   are navigation aids, not a separate DMT taxonomy.
 

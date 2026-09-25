@@ -81,8 +81,8 @@ def test_config_loads_severity_and_fail_on_warning(tmp_path: Path) -> None:
         dedent(
             """
             [tool.docmethis.check]
-            fail_on_warning = true
-            include_visibility = ["public", "protected"]
+            fail-on-warning = true
+            include-visibility = ["public", "protected"]
 
             [tool.docmethis.check.severity]
             DMT-1120 = "warning"
@@ -111,8 +111,8 @@ def test_config_loads_path_filters_and_matches_directory_boundaries(tmp_path: Pa
     (tmp_path / "pyproject.toml").write_text(
         """
 [tool.docmethis.check]
-exclude_paths = ["tests", "generated.py"]
-dia_exclude_paths = ["fixtures"]
+exclude-paths = ["tests", "generated.py"]
+dia-exclude-paths = ["fixtures"]
 """.strip()
         + "\n",
         encoding="utf-8",
@@ -134,6 +134,25 @@ def test_config_rejects_unsafe_path_filters() -> None:
         CheckConfig(exclude_paths=("../tests",))
     with pytest.raises(ValueError, match="glob"):
         CheckConfig(exclude_paths=("tests/*",))
+
+
+def test_config_rejects_unknown_or_underscore_keys(tmp_path: Path) -> None:
+    """Check configuration uses only the documented kebab-case TOML keys."""
+    (tmp_path / "pyproject.toml").write_text(
+        "[tool.docmethis.check]\nfail_on_warning = true\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="fail_on_warning"):
+        load_check_config(tmp_path)
+
+    (tmp_path / "pyproject.toml").write_text(
+        "[tool.docmethis.check]\nunknown-option = true\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="unknown-option"):
+        load_check_config(tmp_path)
 
 
 def test_config_loads_builtin_profile_before_code_overrides(tmp_path: Path) -> None:
@@ -266,12 +285,12 @@ class TestConfigEnum:
         assert config.check_mode == CheckMode.REGRESSION
 
     def test_check_mode_from_pyproject(self, tmp_path: Path) -> None:
-        (tmp_path / "pyproject.toml").write_text('[tool.docmethis.check]\ncheck_mode = "catchup"\n', encoding="utf-8")
+        (tmp_path / "pyproject.toml").write_text('[tool.docmethis.check]\ncheck-mode = "catchup"\n', encoding="utf-8")
         config = load_check_config(tmp_path)
         assert config.check_mode is CheckMode.CATCHUP
 
     def test_check_mode_value_invalid(self, tmp_path: Path) -> None:
-        (tmp_path / "pyproject.toml").write_text('[tool.docmethis.check]\ncheck_mode = "regresion"\n', encoding="utf-8")
+        (tmp_path / "pyproject.toml").write_text('[tool.docmethis.check]\ncheck-mode = "regresion"\n', encoding="utf-8")
         with pytest.raises(ValueError, match="regresion"):
             load_check_config(tmp_path)
 
@@ -281,12 +300,12 @@ class TestConfigEnum:
         assert config.annotation_placement is AnnotationPlacement.SIGNATURE
 
     def test_annotation_placement_from_pyproject(self, tmp_path: Path) -> None:
-        (tmp_path / "pyproject.toml").write_text('[tool.docmethis.check]\nannotation_placement = "precise"\n', encoding="utf-8")
+        (tmp_path / "pyproject.toml").write_text('[tool.docmethis.check]\nannotation-placement = "precise"\n', encoding="utf-8")
         config = load_check_config(tmp_path)
         assert config.annotation_placement is AnnotationPlacement.PRECISE
 
     def test_annotation_placement_value_invalid(self, tmp_path: Path) -> None:
-        (tmp_path / "pyproject.toml").write_text('[tool.docmethis.check]\nannotation_placement = "wrong"\n', encoding="utf-8")
+        (tmp_path / "pyproject.toml").write_text('[tool.docmethis.check]\nannotation-placement = "wrong"\n', encoding="utf-8")
         with pytest.raises(ValueError, match="wrong"):
             load_check_config(tmp_path)
 
@@ -296,12 +315,12 @@ class TestConfigEnum:
         assert config.on_missing_base is OnMissingBase.EMIT_ALL
 
     def test_on_missing_base_from_pyproject(self, tmp_path: Path) -> None:
-        (tmp_path / "pyproject.toml").write_text('[tool.docmethis.check]\non_missing_base = "fail"\n', encoding="utf-8")
+        (tmp_path / "pyproject.toml").write_text('[tool.docmethis.check]\non-missing-base = "fail"\n', encoding="utf-8")
         config = load_check_config(tmp_path)
         assert config.on_missing_base is OnMissingBase.FAIL
 
     def test_on_missing_base_value_invalid(self, tmp_path: Path) -> None:
-        (tmp_path / "pyproject.toml").write_text('[tool.docmethis.check]\non_missing_base = "catchup"\n', encoding="utf-8")
+        (tmp_path / "pyproject.toml").write_text('[tool.docmethis.check]\non-missing-base = "catchup"\n', encoding="utf-8")
         with pytest.raises(ValueError, match="catchup"):
             load_check_config(tmp_path)
 
@@ -320,7 +339,7 @@ class TestConfigEnum:
 
     def test_method_exception_contract_from_pyproject(self, tmp_path: Path) -> None:
         (tmp_path / "pyproject.toml").write_text(
-            '[tool.docmethis.check]\nmethod_exception_contract = "class_aggregate"\n',
+            '[tool.docmethis.check]\nmethod-exception-contract = "class_aggregate"\n',
             encoding="utf-8",
         )
         config = load_check_config(tmp_path)
@@ -328,7 +347,7 @@ class TestConfigEnum:
 
     def test_method_exception_contract_value_invalid(self, tmp_path: Path) -> None:
         (tmp_path / "pyproject.toml").write_text(
-            '[tool.docmethis.check]\nmethod_exception_contract = "method"\n',
+            '[tool.docmethis.check]\nmethod-exception-contract = "method"\n',
             encoding="utf-8",
         )
         with pytest.raises(ValueError, match="method"):
@@ -373,7 +392,7 @@ def test_cli_no_fail_on_warning_overrides_pyproject(
 ) -> None:
     """The action can disable fail_on_warning even when pyproject.toml enables it."""
     (tmp_path / "pyproject.toml").write_text(
-        "[tool.docmethis.check]\nfail_on_warning = true\n",
+        "[tool.docmethis.check]\nfail-on-warning = true\n",
         encoding="utf-8",
     )
     outcome = CheckResult()

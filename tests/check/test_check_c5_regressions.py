@@ -54,7 +54,7 @@ def test_run_check_respects_on_nonlinear_push_from_config(monkeypatch: pytest.Mo
 
 def test_config_rejects_survey_check_mode(tmp_path: Path) -> None:
     """The survey mode is not implemented and is rejected by pyproject.toml."""
-    (tmp_path / "pyproject.toml").write_text('[tool.docmethis.check]\ncheck_mode = "survey"\n', encoding="utf-8")
+    (tmp_path / "pyproject.toml").write_text('[tool.docmethis.check]\ncheck-mode = "survey"\n', encoding="utf-8")
 
     with pytest.raises(ValueError, match="survey"):
         load_check_config(tmp_path)
