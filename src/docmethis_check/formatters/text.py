@@ -814,8 +814,22 @@ def _display_path(path: str, project_root: Path | None) -> str:
 
 
 def _status(result: CheckResult, *, fail_on_warning: bool) -> str:
-    """Return the displayed status for the result and active warning policy."""
-    if result.summary.error_count or (fail_on_warning and result.summary.warning_count):
+    """Return the displayed status for the result and active warning policy.
+
+    Parameters
+    ----------
+    result : CheckResult
+        Check result whose diagnostics and analysis errors determine the status.
+    fail_on_warning : bool
+        Whether warnings should produce a failing status.
+
+    Returns
+    -------
+    str
+        ``FAIL``, ``WARN``, or ``PASS``.
+
+    """
+    if result.analysis_errors or result.summary.error_count or (fail_on_warning and result.summary.warning_count):
         return "FAIL"
     if result.summary.warning_count:
         return "WARN"

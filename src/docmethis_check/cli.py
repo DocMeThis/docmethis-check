@@ -300,7 +300,7 @@ def main(argv: list[str] | None = None) -> int:
         sys.stderr.write(f"docmethis_check: {exc}\n")
         return 2
 
-    if result.summary.error_count > 0 or (config.fail_on_warning and result.summary.warning_count > 0):
+    if result.analysis_errors or result.summary.error_count > 0 or (config.fail_on_warning and result.summary.warning_count > 0):
         return 1
     return 0
 
