@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 def test_config_reads_symbol_kinds_from_pyproject_and_cli(tmp_path: Path) -> None:
     """Phase 0 exposes the scope of symbol kinds."""
     (tmp_path / "pyproject.toml").write_text(
-        '[tool.docmethis.check]\nsymbol_kinds = ["class", "module"]\n',
+        '[tool.docmethis.check]\nsymbol-kinds = ["class", "module"]\n',
         encoding="utf-8",
     )
 
@@ -35,7 +35,7 @@ def test_config_reads_symbol_kinds_from_pyproject_and_cli(tmp_path: Path) -> Non
 def test_config_reads_property_accessors_with_both_as_default(tmp_path: Path) -> None:
     """Property policy defaults to both source accessors and is configurable."""
     (tmp_path / "pyproject.toml").write_text(
-        '[tool.docmethis.check]\nproperty_accessors = ["getter"]\n',
+        '[tool.docmethis.check]\nproperty-accessors = ["getter"]\n',
         encoding="utf-8",
     )
 
