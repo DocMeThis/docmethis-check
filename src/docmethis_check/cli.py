@@ -132,7 +132,9 @@ def create_parser() -> argparse.ArgumentParser:
         "--property-accessors",
         type=str,
         default=None,
-        help="Property accessors to check, comma-separated: getter,setter (default: getter,setter)",
+        help=(
+            "Property accessors to check, comma-separated: getter,setter; empty disables accessor checks (default: getter,setter)"
+        ),
     )
     parser.add_argument(
         "--exclude-paths",
@@ -246,7 +248,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         include_visibility = parse_include_visibility(args.include_visibility) if args.include_visibility else None
         symbol_kinds = parse_symbol_kinds(args.symbol_kinds) if args.symbol_kinds else None
-        property_accessors = parse_property_accessors(args.property_accessors) if args.property_accessors else None
+        property_accessors = parse_property_accessors(args.property_accessors) if args.property_accessors is not None else None
         exclude_paths = parse_path_filters(args.exclude_paths) if args.exclude_paths is not None else None
         dia_exclude_paths = parse_path_filters(args.dia_exclude_paths) if args.dia_exclude_paths is not None else None
         config = load_check_config(

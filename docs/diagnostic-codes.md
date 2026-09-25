@@ -32,6 +32,9 @@ symbol-kinds = ["function", "method", "class"]
 property-accessors = ["getter", "setter"]
 ```
 
+Use `property-accessors = []` (or `--property-accessors ""`) to skip getter and
+setter checks while keeping ordinary methods selected by `symbol-kinds`.
+
 Bold cells show the resulting default combination: selected kind, `public`,
 and Standard severity. A bold code is eligible by default, not guaranteed to
 produce a finding. Add modules, protected/private visibility, or other kinds

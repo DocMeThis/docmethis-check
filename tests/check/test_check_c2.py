@@ -633,6 +633,51 @@ def test_property_accessor_policy_filters_getter_and_setter(tmp_path: Path) -> N
     assert {key.accessor_kind for key in getter_keys if key.code == "DMT-1140"} == {"getter"}
 
 
+def test_empty_property_accessor_policy_keeps_normal_methods(tmp_path: Path) -> None:
+    content = dedent(
+        """
+    class Service:
+        def normal(self):
+            return 1
+
+        @property
+        def value(self):
+            return self._value
+
+        @value.setter
+        def value(self, value):
+            self._value = value
+        """
+    ).strip()
+
+    entries, _keys = diagnostics.diagnostics_for_file(
+        content,
+        tmp_path / "module.py",
+        tmp_path,
+        CheckConfig(property_accessors=frozenset()),
+    )
+
+    assert any(entry.code == "DMT-1130" for entry in entries)
+    assert not any(entry.code == "DMT-1140" for entry in entries)
+
+
+def test_cli_empty_property_accessor_option_disables_accessors(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_load_check_config(_project: Path, **kwargs: object) -> CheckConfig:
+        captured.update(kwargs)
+        return CheckConfig()
+
+    monkeypatch.setattr(cli, "load_check_config", fake_load_check_config)
+    monkeypatch.setattr(cli, "run_check", lambda **_: CheckResult())
+
+    assert cli.main([str(tmp_path), "--property-accessors", ""]) == 0
+    assert captured["property_accessors"] == frozenset()
+
+
 def test_run_check_public_method_on_private_class(tmp_path: Path) -> None:
     """A public method of a private class is private (DMT-1330)."""
     _initialize_repo(tmp_path)

@@ -66,6 +66,7 @@ def test_help_exposes_c9_output_options() -> None:
     assert "default: signature" in help_text
     assert "default: emit_all" in help_text
     assert "default: callable" in help_text
+    assert "empty disables accessor checks" in help_text
     assert "default: enabled" in help_text
 
 
