@@ -1,5 +1,5 @@
 # ============================================================
-# Policies de génération accessibles au projet consommateur
+# Generation policies available to the consuming project
 # ============================================================
 
 [fix.default]
