@@ -259,6 +259,9 @@ base and is not considered an unavailable snapshot.
 
 ## Diagnostic Codes
 
+See the [complete diagnostic code reference](docs/diagnostic-codes.md) for the
+profile matrix, symbol selection, visibility scope, and fixability of each code.
+
 Check emits native `DMT-XXXX` codes whose numbering and meaning are derived
 from the proposed [Taxonomy of Documentation Violations (TDV)](https://github.com/DocMeThis/tdv-registry),
 a tool-independent, language-scoped registry. For the current Python
