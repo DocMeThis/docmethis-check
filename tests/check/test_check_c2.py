@@ -163,15 +163,22 @@ DMT-2001 = "warning"
         ("loose", "DMT-2002", "error"),
         ("loose", "DMT-2001", "warning"),
         ("loose", "DMT-2003", "warning"),
-        ("loose", "DMT-2120", "warning"),
-        ("loose", "DMT-3010", "warning"),
+        ("loose", "DMT-2120", "disabled"),
+        ("loose", "DMT-3010", "disabled"),
         ("loose", "DMT-1120", "disabled"),
         ("loose", "DMT-1220", "disabled"),
+        ("loose", "DMT-4202", "warning"),
         ("standard", "DMT-1120", "error"),
-        ("standard", "DMT-1320", "error"),
+        ("standard", "DMT-1201", "warning"),
+        ("standard", "DMT-1301", "disabled"),
+        ("standard", "DMT-1320", "disabled"),
+        ("standard", "DMT-2003", "warning"),
+        ("standard", "DMT-2120", "warning"),
+        ("standard", "DMT-3001", "error"),
         ("standard", "DMT-6201", "warning"),
-        ("standard", "DMT-6051", "disabled"),
+        ("standard", "DMT-6051", "warning"),
         ("strict", "DMT-1120", "error"),
+        ("strict", "DMT-4102", "error"),
         ("strict", "DMT-6051", "warning"),
     ],
 )
@@ -613,7 +620,10 @@ def test_run_check_public_method_on_private_class(tmp_path: Path) -> None:
         """,
     )
 
-    config = CheckConfig(include_visibility=frozenset({Visibility.PUBLIC, Visibility.PROTECTED, Visibility.PRIVATE}))
+    config = CheckConfig(
+        include_visibility=frozenset({Visibility.PUBLIC, Visibility.PROTECTED, Visibility.PRIVATE}),
+        profile="strict",
+    )
     outcome = run_check(tmp_path, config=config)
 
     codes = {check.code for check in outcome.checks}
@@ -645,7 +655,10 @@ def test_run_check_selection_combines_class_visibility(tmp_path: Path) -> None:
         """,
     )
 
-    result_private = run_check(tmp_path, config=CheckConfig(include_visibility=frozenset({Visibility.PRIVATE})))
+    result_private = run_check(
+        tmp_path,
+        config=CheckConfig(include_visibility=frozenset({Visibility.PRIVATE}), profile="strict"),
+    )
     assert any(check.code == "DMT-1330" for check in result_private.checks)
 
     result_public = run_check(tmp_path)
@@ -679,7 +692,10 @@ def test_run_check_public_attribute_on_private_class(tmp_path: Path) -> None:
         """,
     )
 
-    config = CheckConfig(include_visibility=frozenset({Visibility.PUBLIC, Visibility.PROTECTED, Visibility.PRIVATE}))
+    config = CheckConfig(
+        include_visibility=frozenset({Visibility.PUBLIC, Visibility.PROTECTED, Visibility.PRIVATE}),
+        profile="strict",
+    )
     outcome = run_check(tmp_path, config=config)
 
     codes = {check.code for check in outcome.checks}

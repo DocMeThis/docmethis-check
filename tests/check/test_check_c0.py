@@ -526,9 +526,13 @@ def test_run_check_distinguishes_returns_section_without_type(monkeypatch: pytes
     outcome = run_check(str(tmp_path))
 
     # The docstring documents an int type, so it does not produce DMT-3010.
-    # The Verify blank-line warning is not a misspelled_section, so it is ignored.
-    assert outcome.checks == []
-    assert outcome.summary.pass_count >= 1
+    # Standard reports the missing blank line as a warning.
+    assert [(check.code, check.severity) for check in outcome.checks] == [
+        ("DMT-6051", "warning"),
+    ]
+    assert outcome.summary.warning_count == 1
+    assert outcome.summary.error_count == 0
+    assert outcome.summary.pass_count == 0
 
 
 def test_run_check_reports_multiline_signature_and_docstring_lines(tmp_path: Path) -> None:
