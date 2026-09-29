@@ -357,6 +357,7 @@ def run_check(  # noqa: PLR0913 - public API; the parameter count is intentional
     result.diff_files = [_changed_file_to_dict(changed_file) for changed_file in discovered_files_list]
 
     if diff_range.revision_spec is None:
+        result.summary.warning_count += 1
         if configuration.dia:
             result.impact_analysis = ImpactAnalysis(completeness="inconclusive", reason="missing_diff_base")
         return result
