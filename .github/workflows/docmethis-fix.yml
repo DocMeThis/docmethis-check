@@ -52,11 +52,11 @@ jobs:
           echo "DOCMETHIS_FIX_API_KEY_FILE=$key_file" >> "$GITHUB_ENV"
 
       - name: Generate the Check hand-off
+        env:
+          GITHUB_BEFORE_SHA: ${{ github.event.before }}
         run: |
-          empty_tree="$(git hash-object -t tree /dev/null)"
           set +e
           "$FIX_PYTHON" -m docmethis_check . \
-            --git-diff "${empty_tree}..HEAD" \
             --check-mode regression \
             --base-ref main \
             --no-cache \

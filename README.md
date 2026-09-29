@@ -92,8 +92,8 @@ Copy the [ready-to-use workflow](https://github.com/DocMeThis/docmethis-check/bl
 `.github/workflows/` in your repository. It checks documentation consistency,
 adds GitHub annotations, and never invokes Fix. A separate
 [Fix workflow](https://github.com/DocMeThis/docmethis-check/blob/main/.github/workflows/docmethis-fix.yml)
-is manual-only and requires the private runtime, Fix configuration, Gateway key,
-and provider credentials.
+is triggered by feature-branch pushes and requires the private runtime, Fix
+configuration, Gateway key, and provider credentials.
 
 > **Security note:** This workflow uses `@main`, so it follows the latest code
 > on the DocMeThis Check `main` branch. This is useful for testing the action
@@ -104,8 +104,9 @@ The workflow downloads your project and runs Check on every pull request. It
 keeps the project's history so Check can compare the version you are submitting
 with the previous version.
 
-The Fix workflow generates a Check report, applies eligible Fix corrections, and
-opens a pull request with `--pr`.
+The Fix workflow generates a regression-scoped Check report, applies eligible Fix
+corrections, and opens a pull request with `--pr`. It ignores `main` and
+`master`, and skips its own bot commits to avoid recursive runs.
 
 ### Local CLI
 
