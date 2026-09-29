@@ -392,7 +392,7 @@ def run_check(  # noqa: PLR0913 - public API; the parameter count is intentional
             configuration=extraction_configuration,
             skip_dynamic=True,
             write_cache=write_cache,
-            raw_records=raw_records,
+            raw_records=raw_records if configuration.dia and (dia_context_files_list or not discovered_files_list) else None,
         )
     finally:
         # Parse failures are rendered in the report instead of leaking as a separate warning line.
