@@ -106,6 +106,17 @@ def test_config_loads_severity_and_fail_on_warning(tmp_path: Path) -> None:
     assert config.severity_for("DMT-1120", "error") == "warning"
 
 
+def test_config_rejects_non_boolean_fail_on_warning(tmp_path: Path) -> None:
+    """TOML booleans are not accepted when represented as strings."""
+    (tmp_path / "pyproject.toml").write_text(
+        '[tool.docmethis.check]\nfail-on-warning = "true"\n',
+        encoding="utf-8",
+    )
+
+    with pytest.raises(TypeError, match="fail-on-warning"):
+        load_check_config(tmp_path)
+
+
 def test_config_loads_path_filters_and_matches_directory_boundaries(tmp_path: Path) -> None:
     """Path filters load from pyproject and match files without prefix collisions.
 
@@ -1007,6 +1018,33 @@ def test_entrypoint_publishes_annotations_from_file() -> None:
     assert '--github-output-file "$annotations_file"' in payload
     assert 'cat "$annotations_file"' in payload
     assert "--format github" not in payload
+
+
+@pytest.mark.parametrize("value", ["treu", "True", "0"])
+def test_entrypoint_rejects_invalid_boolean(value: str) -> None:
+    """The Action adapter rejects non-canonical boolean inputs before Python runs."""
+    outcome = subprocess.run(
+        ["sh", "entrypoint.sh", "--fail-on-warning", value],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert outcome.returncode == 2
+    assert "Invalid boolean" in outcome.stderr
+
+
+def test_entrypoint_rejects_missing_boolean_value() -> None:
+    """The Action adapter distinguishes a missing value from an explicit empty value."""
+    outcome = subprocess.run(
+        ["sh", "entrypoint.sh", "--fail-on-warning"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert outcome.returncode == 2
+    assert "requires a value" in outcome.stderr
 
 
 @pytest.mark.docker

@@ -20,7 +20,11 @@ while [ "$#" -gt 0 ]; do
       shift 2
       ;;
     --fail-on-warning)
-      fail_on_warning="${2:-}"
+      if [ "$#" -lt 2 ]; then
+        echo "--fail-on-warning requires a value" >&2
+        exit 2
+      fi
+      fail_on_warning="$2"
       shift 2
       ;;
     --include-visibility)
@@ -65,6 +69,14 @@ while [ "$#" -gt 0 ]; do
       ;;
   esac
 done
+
+case "$fail_on_warning" in
+  ""|true|false) ;;
+  *)
+    echo "Invalid boolean for --fail-on-warning: $fail_on_warning" >&2
+    exit 2
+    ;;
+esac
 
 case "$project_path" in
   /*) ;;
