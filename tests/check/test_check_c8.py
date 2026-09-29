@@ -51,6 +51,21 @@ def test_report_v1_omits_unknown_facts() -> None:
     }
 
 
+def test_report_publishes_analysis_errors(tmp_path: Path) -> None:
+    """Source-analysis failures are separate from diagnostic checks."""
+    outcome = CheckResult(
+        analysis_errors=[
+            {"file": "/tmp/broken.py", "type": "parse_error", "message": "Unable to parse the file."},
+        ],
+    )
+
+    data = json.loads(format_json(outcome, file=str(tmp_path / "report.json")))
+
+    assert data["analysis_errors"] == [
+        {"file": "/tmp/broken.py", "type": "parse_error", "message": "Unable to parse the file."},
+    ]
+
+
 def test_report_v1_serializes_structured_facts_without_internal_key() -> None:
     """Structured v1 facts are published without exposing diagnostic_key."""
     outcome = CheckResult(
