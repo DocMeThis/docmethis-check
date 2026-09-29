@@ -22,6 +22,7 @@ from docmethis_extract_python.api import (
 
 from docmethis_check.config import CheckConfig, load_check_config, path_matches_filters
 from docmethis_check.dia import _analyze_documentation_impacts, _base_head_models
+from docmethis_check.dia.context import _accessor_is_enabled, _record_accessor_kind
 from docmethis_check.diagnostics import base_classes, base_diagnostics, base_functions, diagnostics_for_file
 from docmethis_check.git_diff import ChangedFile, DiffRange, discover_changed_python_files
 from docmethis_check.models import CheckEntry, CheckMode, CheckResult, ImpactAnalysis, Severity, SymbolKind
@@ -205,17 +206,6 @@ def _function_symbol_kind(func: FunctionRecord) -> SymbolKind:
     return SymbolKind.METHOD if func.parent_class is not None else SymbolKind.FUNCTION
 
 
-def _record_accessor_kind(record: object) -> str | None:
-    """Return a stable getter/setter role for a property record."""
-    method_kind = getattr(record, "method_kind", None)
-    if getattr(method_kind, "value", method_kind) != "property":
-        return None
-
-    accessor = getattr(record, "property_accessor", None)
-    value = getattr(accessor, "value", accessor)
-    return value if value in {"getter", "setter"} else "getter"
-
-
 def _selected_record_symbol(
     record: _RecordWithIdentity,
     *,
@@ -251,9 +241,9 @@ def _selected_record_symbol(
         not included in the configuration.
 
     """
-    accessor_kind = _record_accessor_kind(record)
-    if accessor_kind is not None and accessor_kind not in {accessor.value for accessor in config.property_accessors}:
+    if not _accessor_is_enabled(record, config):
         return None
+    accessor_kind = _record_accessor_kind(record)
     symbol = _SymbolCheck(kind=kind, symbol=record.qualified_name, accessor_kind=accessor_kind)
     if symbol.kind not in config.symbol_kinds:
         return None

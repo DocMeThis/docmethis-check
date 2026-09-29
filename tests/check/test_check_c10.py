@@ -315,6 +315,62 @@ def test_delta_exception_local_added(tmp_path: Path) -> None:
     assert _tuple_delta(deltas[1]) == ("module.f", "exception", "ValueError:local", "retiré", Confidence.EXPLICIT)
 
 
+def test_property_accessor_filter_applies_to_dia_and_api_deltas(tmp_path: Path) -> None:
+    """Disabled property accessors do not create behavioral or API impacts."""
+    base = _analyze_sources(
+        tmp_path,
+        "base",
+        {
+            "module.py": _src(
+                "class Service:",
+                "    @property",
+                "    def value(self) -> int:",
+                '        """Current value."""',
+                "        return 1",
+                "",
+                "    def normal(self) -> int:",
+                '        """Normal value."""',
+                "        return 1",
+            )
+        },
+    )
+    head = _analyze_sources(
+        tmp_path,
+        "head",
+        {
+            "module.py": _src(
+                "class Service:",
+                "    @property",
+                "    def value(self) -> str:",
+                '        """Current value."""',
+                '        with open("audit.log", "w", encoding="utf-8") as handle:',
+                '            handle.write("changed")',
+                '        return "changed"',
+                "",
+                "    def normal(self) -> str:",
+                '        """Normal value."""',
+                '        raise KeyError("changed")',
+            )
+        },
+    )
+    configuration = CheckConfig(property_accessors=frozenset())
+
+    base_keys = _extract_behavioral_keys(base.modules, configuration)
+    head_keys = _extract_behavioral_keys(head.modules, configuration)
+    deltas = _behavioral_delta(base_keys, head_keys)
+    api_changes = _api_diff(
+        _extract_declarative_signatures(base.modules, configuration),
+        _extract_declarative_signatures(head.modules, configuration),
+    )
+
+    assert "module.Service.value" not in base_keys
+    assert "module.Service.value" not in head_keys
+    assert not any(delta.symbol == "module.Service.value" for delta in deltas)
+    assert any(delta.symbol == "module.Service.normal" for delta in deltas)
+    assert not any(change.symbol == "module.Service.value" for change in api_changes)
+    assert any(change.symbol == "module.Service.normal" for change in api_changes)
+
+
 def test_delta_propagation_new_via_callgraph(tmp_path: Path) -> None:
     """A newly propagated exception produces a propagated delta for its caller."""
     base = _analyze_sources(
