@@ -43,6 +43,7 @@ def format(result: CheckResult, file: str | None = None) -> str:  # noqa: A001
             },
         },
         "checks": [_serialize_check(check) for check in result.checks],
+        "analysis_errors": result.analysis_errors,
         "diff": _serialize_diff(result),
         "regression_filter": _serialize_regression_filter(result),
     }

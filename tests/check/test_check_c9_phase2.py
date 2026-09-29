@@ -234,3 +234,20 @@ def test_changed_syntax_error_is_reported_in_text_report(tmp_path: Path, caplog:
     assert "No documentation issues found in checked files." in output
     assert "Skipped: broken.py — syntax error" in output
     assert not any("Syntax error in" in record.getMessage() for record in caplog.records)
+
+
+def test_github_output_publishes_analysis_errors(tmp_path: Path) -> None:
+    """Source-analysis failures become file-level GitHub errors."""
+    broken = tmp_path / "broken.py"
+    result = CheckResult(
+        analysis_errors=[
+            {"file": str(broken), "type": "parse_error", "message": "Unable to parse: %bad"},
+        ],
+    )
+    output_file = tmp_path / "annotations.txt"
+
+    format_github(result, file=str(output_file))
+
+    assert output_file.read_text(encoding="utf-8") == (
+        f"::error file={broken},title=DocMeThis analysis error::parse_error: Unable to parse: %25bad\n"
+    )
