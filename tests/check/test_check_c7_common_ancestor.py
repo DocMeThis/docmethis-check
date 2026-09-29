@@ -222,11 +222,15 @@ def test_nonlinear_push_head_commit_rejects_root_commit(monkeypatch: pytest.Monk
         )
 
 
+@pytest.mark.parametrize(("fail_on_warning", "expected_code"), [(True, 1), (False, 0)])
 def test_missing_ancestor_warn_produces_annotations_and_json(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    fail_on_warning: bool,
+    expected_code: int,
 ) -> None:
-    """The warn mode returns explicit success without running M1 analysis."""
+    """The warn mode is exposed consistently and obeys fail-on-warning."""
     _initialize_repository(tmp_path)
     module = tmp_path / "module.py"
     module.write_text("x = 1\n", encoding="utf-8")
@@ -249,29 +253,37 @@ def test_missing_ancestor_warn_produces_annotations_and_json(
 
     report = tmp_path / "report.json"
     annotations = tmp_path / "annotations.txt"
-    code = cli.main(
-        [
-            str(tmp_path),
-            "--github-output-file",
-            str(annotations),
-            "--json-output-file",
-            str(report),
-            "--fail-on-warning",
-            "--on-nonlinear-push-without-base",
-            "warn",
-        ]
-    )
+    args = [
+        str(tmp_path),
+        "--github-output-file",
+        str(annotations),
+        "--json-output-file",
+        str(report),
+        "--on-nonlinear-push-without-base",
+        "warn",
+    ]
+    if fail_on_warning:
+        args.append("--fail-on-warning")
+    code = cli.main(args)
 
     output = annotations.read_text(encoding="utf-8")
     data = json.loads(report.read_text(encoding="utf-8"))
-    assert code == 0
+    assert code == expected_code
     assert "::warning title=DocMeThis inconclusive diff::" in output
     assert data["diff"] == {
         "strategy": "github_no_reliable_base",
         "completeness": "none",
         "reason": "nonlinear_push_without_base",
     }
+    assert data["summary"]["checks"]["warning"] == 1
+    assert data["summary"]["checks"]["total"] == 1
     assert data["checks"] == []
+
+    text_args = [str(tmp_path), "--on-nonlinear-push-without-base", "warn"]
+    if fail_on_warning:
+        text_args.append("--fail-on-warning")
+    assert cli.main(text_args) == expected_code
+    assert "1 warning" in capsys.readouterr().out
 
 
 def test_inaccessible_json_report_returns_cli_error(
