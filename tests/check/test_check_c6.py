@@ -232,6 +232,29 @@ def test_config_rejects_unknown_severity(tmp_path: Path) -> None:
         load_check_config(tmp_path)
 
 
+def test_config_rejects_unknown_diagnostic_code(tmp_path: Path) -> None:
+    """An unknown DMT code cannot silently become a no-op override."""
+    (tmp_path / "pyproject.toml").write_text(
+        '[tool.docmethis.check.severity]\nDMT-9999 = "error"\n',
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="Unknown diagnostic code"):
+        load_check_config(tmp_path)
+
+
+def test_check_config_rejects_unknown_diagnostic_code_directly() -> None:
+    """Direct configuration construction uses the same severity contract."""
+    with pytest.raises(ValueError, match="Unknown diagnostic code"):
+        CheckConfig(severity={"DMT-9999": "error"})
+
+
+def test_check_config_rejects_malformed_severity_mapping() -> None:
+    """Direct configuration rejects non-string severity values."""
+    with pytest.raises(TypeError, match="severity must map codes to strings"):
+        CheckConfig(severity={"DMT-1120": True})
+
+
 def test_disabled_diagnostic_produces_no_entry_or_key(tmp_path: Path) -> None:
     """A disabled diagnostic is absent from the report and regression filter."""
     config = CheckConfig(severity={"DMT-1120": "disabled"})

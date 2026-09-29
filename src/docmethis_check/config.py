@@ -98,6 +98,7 @@ def _load_profiles() -> dict[str, dict[str, str]]:
 
 
 _PROFILES = _load_profiles()
+_CHECK_DIAGNOSTIC_CODES = frozenset(code for profile in _PROFILES.values() for code in profile)
 
 
 def _normalize_profile(value: object) -> str:
@@ -293,6 +294,7 @@ class CheckConfig:
         """
         type_check(value=self.fail_on_warning, expected_alias_type=StrictBool, field="fail_on_warning")
         type_check(value=self.dia, expected_alias_type=StrictBool, field="dia")
+        object.__setattr__(self, "severity", _validate_severity_mapping(self.severity, field="severity"))
         profile = _normalize_profile(self.profile)
         object.__setattr__(self, "profile", profile)
         method_exception_contract = normalize_str_enum_value(
@@ -947,16 +949,23 @@ def _read_severities(section: dict[str, object]) -> dict[str, Severity]:
         Explicitly raised.
 
     """
-    value = section.get("severity", {})
+    return _validate_severity_mapping(section.get("severity", {}), field="tool.docmethis.check.severity")
+
+
+def _validate_severity_mapping(value: object, *, field: str) -> dict[str, Severity]:
+    """Validate severity overrides against the Check diagnostic contract."""
     if not isinstance(value, dict):
-        msg = "tool.docmethis.check.severity must be a TOML table."
+        msg = f"{field} must be a TOML table."
         raise TypeError(msg)
 
     severities: dict[str, Severity] = {}
     for code, severity in value.items():
         if not isinstance(code, str) or not isinstance(severity, str):
-            msg = "tool.docmethis.check.severity must map codes to strings."
+            msg = f"{field} must map codes to strings."
             raise TypeError(msg)
+        if code not in _CHECK_DIAGNOSTIC_CODES:
+            msg = f"Unknown diagnostic code in {field}: {code!r}."
+            raise ValueError(msg)
         if severity not in _VALID_SEVERITIES:
             msg = f"Invalid severity for {code}: {severity!r}. Expected values: error, warning, disabled."
             raise ValueError(msg)

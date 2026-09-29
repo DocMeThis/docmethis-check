@@ -402,6 +402,8 @@ def run_check(  # noqa: PLR0913 - public API; the parameter count is intentional
                 root=root,
                 configuration=configuration,
             )
+            if dia_context_files_list and not dia_changed_files_list and result.impact_analysis is not None:
+                result.impact_analysis.reason = "all_paths_excluded"
         else:
             result.impact_analysis = ImpactAnalysis(completeness="complete", reason="all_paths_excluded")
 
