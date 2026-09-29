@@ -642,13 +642,22 @@ def test_property_accessor_policy_filters_getter_and_setter(tmp_path: Path) -> N
         tmp_path,
         CheckConfig(property_accessors=frozenset({PropertyAccessor.GETTER})),
     )
+    setter_only, setter_keys = diagnostics.diagnostics_for_file(
+        content,
+        tmp_path / "module.py",
+        tmp_path,
+        CheckConfig(property_accessors=frozenset({PropertyAccessor.SETTER})),
+    )
 
     missing_both = [entry for entry in both if entry.code == "DMT-1140"]
     missing_getter = [entry for entry in getter_only if entry.code == "DMT-1140"]
+    missing_setter = [entry for entry in setter_only if entry.code == "DMT-1140"]
     assert {entry.accessor_kind for entry in missing_both} == {"getter", "setter"}
     assert [entry.accessor_kind for entry in missing_getter] == ["getter"]
+    assert [entry.accessor_kind for entry in missing_setter] == ["setter"]
     assert {key.accessor_kind for key in both_keys if key.code == "DMT-1140"} == {"getter", "setter"}
     assert {key.accessor_kind for key in getter_keys if key.code == "DMT-1140"} == {"getter"}
+    assert {key.accessor_kind for key in setter_keys if key.code == "DMT-1140"} == {"setter"}
 
 
 def test_empty_property_accessor_policy_keeps_normal_methods(tmp_path: Path) -> None:
