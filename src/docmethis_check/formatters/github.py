@@ -66,6 +66,7 @@ def format(  # noqa: A001
 
     """
     lines = _format_impact_analysis(result)
+    lines.extend(_format_analysis_error(error) for error in result.analysis_errors)
     lines.extend(_format_check(check, annotation_placement) for check in result.checks)
     if result.diff_completeness == "none":
         reason = result.diff_reason or "missing_diff_base"
@@ -284,6 +285,14 @@ def _format_check(check: CheckEntry, annotation_placement: AnnotationPlacement) 
         f"file={_escape_property(_relativize(check.file))},line={line},col={check.col_start},title={_escape_property(check.code)}"
     )
     return f"::{level} {properties}::{_escape_message(check.message)} ({check.code})."
+
+
+def _format_analysis_error(error: dict[str, str]) -> str:
+    """Convert one source-analysis failure into a file-level error."""
+    file = _escape_property(_relativize(error.get("file", "")))
+    error_type = error.get("type", "analysis_error")
+    message = f"{error_type}: {error.get('message', 'Unable to analyze the file.')}"
+    return f"::error file={file},title=DocMeThis analysis error::{_escape_message(message)}"
 
 
 def _escape_message(value: str) -> str:
