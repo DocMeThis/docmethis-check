@@ -10,7 +10,7 @@ from docmethis_extract_python.api import MISSING_VALUE, Confidence, ModuleRecord
 
 from docmethis_check.models import SymbolKind
 
-from .context import _selected_symbol_visibility
+from .context import _accessor_is_enabled, _selected_symbol_visibility
 from .models import DeclarativeChange, DeclarativeParameter, DeclarativeSignature
 
 if TYPE_CHECKING:
@@ -45,6 +45,8 @@ def _extract_declarative_signatures(
             method.qualified_name: class_record.visibility for class_record in module.classes for method in class_record.methods
         }
         for fn in iter_functions([module]):
+            if not _accessor_is_enabled(fn, configuration):
+                continue
             kind = SymbolKind.METHOD if fn.parent_class is not None else SymbolKind.FUNCTION
             if (
                 _selected_symbol_visibility(
