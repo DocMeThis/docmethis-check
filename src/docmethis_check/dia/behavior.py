@@ -18,6 +18,7 @@ from docmethis_extract_python.api import (
 from docmethis_check.models import SymbolKind
 
 from .context import (
+    _accessor_is_enabled,
     _build_symbol_contexts,
     _effective_class_methods,
     _method_origin_confidence,
@@ -102,6 +103,8 @@ def _extract_behavioral_keys(  # noqa: C901
 
         for class_record in module.classes:
             for symbol, fn in _effective_class_methods(class_record, class_index):
+                if not _accessor_is_enabled(fn, configuration):
+                    continue
                 if (
                     _selected_symbol_visibility(
                         fn,

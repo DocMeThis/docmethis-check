@@ -30,6 +30,23 @@ if TYPE_CHECKING:
     from docmethis_check.config import CheckConfig
 
 
+def _record_accessor_kind(record: object) -> str | None:
+    """Return a stable getter/setter role for a property record."""
+    method_kind = getattr(record, "method_kind", None)
+    if getattr(method_kind, "value", method_kind) != "property":
+        return None
+
+    accessor = getattr(record, "property_accessor", None)
+    value = getattr(accessor, "value", accessor)
+    return value if value in {"getter", "setter"} else "getter"
+
+
+def _accessor_is_enabled(record: object, configuration: CheckConfig) -> bool:
+    """Return whether a property accessor is selected by configuration."""
+    accessor_kind = _record_accessor_kind(record)
+    return accessor_kind is None or accessor_kind in {accessor.value for accessor in configuration.property_accessors}
+
+
 def _effective_class_methods(
     class_record: ClassRecord,
     class_index: dict[str, ClassRecord],
