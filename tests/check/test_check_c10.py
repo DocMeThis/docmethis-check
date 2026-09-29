@@ -1150,6 +1150,36 @@ def test_run_check_dia_enabled_impact_analysis(tmp_path: Path) -> None:
     assert contradiction["file"] == "module.py"
 
 
+def test_run_check_excluded_helper_remains_dia_context(tmp_path: Path) -> None:
+    """An excluded helper can still affect an included caller through DIA."""
+    _initialize_repo(tmp_path)
+    _write(tmp_path / "helper.py", "def helper() -> None:\n    return None")
+    _write(
+        tmp_path / "caller.py",
+        'from helper import helper\n\n\ndef caller() -> None:\n    """Calls helper."""\n    helper()',
+    )
+    _commit(tmp_path, "base")
+    sha_base = _sha_head(tmp_path)
+
+    _write(tmp_path / "helper.py", 'def helper() -> None:\n    raise ValueError("changed")')
+    _commit(tmp_path, "head")
+    sha_head = _sha_head(tmp_path)
+
+    outcome = runner.run_check(
+        tmp_path,
+        git_diff=f"{sha_base}..{sha_head}",
+        write_cache=False,
+        config=CheckConfig(profile="strict", exclude_paths=("helper.py",)),
+    )
+
+    assert outcome.impact_analysis is not None
+    assert all(check.file != "helper.py" for check in outcome.checks)
+    assert any(check.code == DMT_4201 and check.symbol == "caller.caller" for check in outcome.checks)
+    assert any(
+        impact["symbol"] == "caller.caller" and impact["provenance"] == "propagated" for impact in outcome.impact_analysis.impacts
+    )
+
+
 def test_run_check_dia_base_unavailable_is_inconclusive(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

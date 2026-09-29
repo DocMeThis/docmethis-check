@@ -357,6 +357,8 @@ def _analyze_documentation_impacts(  # noqa: PLR0913, PLR0917
     base_rev: str | None,
     project_root: Path,
     check_config: CheckConfig,
+    *,
+    emission_files: list[ChangedFile] | None = None,
 ) -> DiaResult:
     """Run DIA phases and produce the ``impact_analysis`` block.
 
@@ -376,6 +378,9 @@ def _analyze_documentation_impacts(  # noqa: PLR0913, PLR0917
     check_config : CheckConfig
         Configuration object that controls DIA analysis behavior, including which behavioral keys and declarative signatures are
         extracted from the module records.
+    emission_files : list[ChangedFile] | None = None
+        Optional filtered changed files eligible for DIA/API emission. When
+        omitted, all ``diff_files`` are eligible.
 
     Returns
     -------
@@ -410,7 +415,10 @@ def _analyze_documentation_impacts(  # noqa: PLR0913, PLR0917
         )
         deltas = _behavioral_delta(base_keys, head_keys)
         head_index = _index_symbols(project_head)
-        diff_paths = {changed_file.path.resolve() for changed_file in diff_files}
+        context_paths = {changed_file.path.resolve() for changed_file in diff_files}
+        emission_paths = {
+            changed_file.path.resolve() for changed_file in (diff_files if emission_files is None else emission_files)
+        }
         dia_filters = check_config.exclude_paths + check_config.dia_exclude_paths
 
         callgraph_base = build_callgraph(base)
@@ -421,8 +429,7 @@ def _analyze_documentation_impacts(  # noqa: PLR0913, PLR0917
             for delta in deltas
             if delta.field == "exception"
             and (record := head_index.get(delta.symbol)) is not None
-            and record.file_path.resolve() in diff_paths
-            and not path_matches_filters(record.file_path, project_root, dia_filters)
+            and record.file_path.resolve() in context_paths
         }
         affected_callers = _affected_callers(callgraph_base, callgraph_head, exception_symbols)
         deltas = _mark_affected_callers(deltas, affected_callers)
@@ -430,7 +437,7 @@ def _analyze_documentation_impacts(  # noqa: PLR0913, PLR0917
         cause_symbols = {
             symbol
             for symbol, record in head_index.items()
-            if symbol in exception_symbols and record.file_path.resolve() in diff_paths
+            if symbol in exception_symbols and record.file_path.resolve() in context_paths
         }
 
         emission = DiaEmissionContext(
@@ -486,7 +493,7 @@ def _analyze_documentation_impacts(  # noqa: PLR0913, PLR0917
         head_signatures = _extract_declarative_signatures(project_head.modules, check_config)
         visible_api_diff = _api_diff_visible(
             project_head,
-            diff_files,
+            [changed_file for changed_file in diff_files if changed_file.path.resolve() in emission_paths],
             impacts,
             _api_diff(base_signatures, head_signatures),
         )
