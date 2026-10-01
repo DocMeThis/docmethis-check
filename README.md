@@ -91,9 +91,10 @@ documentation debt stays out of the way.
 Copy the [ready-to-use workflow](https://github.com/DocMeThis/docmethis-check/blob/main/.github/workflows/docmethis-check.yml) into
 `.github/workflows/` in your repository. It checks documentation consistency,
 adds GitHub annotations, and never invokes Fix. A separate
-[Fix integration skeleton](https://github.com/DocMeThis/docmethis-check/blob/main/.github/workflows/docmethis-fix.yml)
-shows the security boundary, but it is not runnable until the authenticated
-private Fix runtime is configured. Edit the default configuration as you wish.
+[Fix workflow](https://github.com/DocMeThis/docmethis-check/blob/main/.github/workflows/docmethis-fix.yml)
+is triggered by internal pull requests and requires the private runtime, Fix
+configuration, Gateway key, provider credentials, and a write-capable GitHub
+token.
 
 > **Security note:** This workflow uses `@main`, so it follows the latest code
 > on the DocMeThis Check `main` branch. This is useful for testing the action
@@ -103,6 +104,13 @@ private Fix runtime is configured. Edit the default configuration as you wish.
 The workflow downloads your project and runs Check on every pull request. It
 keeps the project's history so Check can compare the version you are submitting
 with the previous version.
+
+The Fix workflow runs only for pull requests from the same repository. It
+generates a regression-scoped Check report, applies eligible Fix corrections,
+and pushes them directly to the pull request source branch with `--push` using
+the built-in `github.token`. It does not open another pull request or run a
+post-check workflow; validation of the resulting commit remains the normal
+responsibility of the repository's CI. Fork pull requests are skipped.
 
 ### Local CLI
 
