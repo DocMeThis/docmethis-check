@@ -248,6 +248,97 @@ def _resolve_ci_push(  # noqa: PLR0913
     raise NoDiffBaseError(msg)
 
 
+def _unresolved_merge_request(
+    *,
+    reason: str,
+    base_rev: str | None,
+    head_rev: str | None,
+    on_nonlinear_push_without_base: str,
+) -> DiffRange:
+    """Return or raise the controlled result for an unresolved GitLab MR."""
+    if on_nonlinear_push_without_base == "warn":
+        return DiffRange(
+            revision_spec=None,
+            strategy="gitlab_no_reliable_base",
+            completeness="none",
+            reason=reason,
+            base_rev=base_rev,
+            head_rev=head_rev,
+        )
+
+    msg = f"GitLab merge request diff is unavailable: {reason.replace('_', ' ')}."
+    raise NoDiffBaseError(msg)
+
+
+def _resolve_ci_merge_request(  # noqa: PLR0913
+    *,
+    git: str,
+    project_root: Path,
+    event_type: str | None,
+    diff_base_sha: str | None,
+    commit_sha: str | None,
+    source_branch_sha: str | None,
+    on_nonlinear_push_without_base: str,
+) -> DiffRange:
+    """Resolve the exact source diff for a GitLab merge request pipeline."""
+    strategies = {
+        "detached": ("gitlab_merge_request_diff_base", commit_sha),
+        "merged_result": ("gitlab_merged_result", source_branch_sha),
+        "merge_train": ("gitlab_merge_train", source_branch_sha),
+    }
+    if event_type not in strategies:
+        reason = "missing_merge_request_event_type" if not event_type else "unknown_merge_request_event_type"
+        return _unresolved_merge_request(
+            reason=reason,
+            base_rev=None,
+            head_rev=None,
+            on_nonlinear_push_without_base=on_nonlinear_push_without_base,
+        )
+
+    strategy, head_sha = strategies[event_type]
+    base_rev = diff_base_sha if diff_base_sha and not _is_zero_sha(diff_base_sha) else None
+    head_rev = head_sha if head_sha and not _is_zero_sha(head_sha) else None
+
+    if base_rev is None:
+        return _unresolved_merge_request(
+            reason="missing_merge_request_diff_base_sha",
+            base_rev=None,
+            head_rev=head_rev,
+            on_nonlinear_push_without_base=on_nonlinear_push_without_base,
+        )
+    if head_rev is None:
+        reason = "missing_merge_request_source_branch_sha" if event_type != "detached" else "missing_merge_request_commit_sha"
+        return _unresolved_merge_request(
+            reason=reason,
+            base_rev=base_rev,
+            head_rev=None,
+            on_nonlinear_push_without_base=on_nonlinear_push_without_base,
+        )
+
+    if not _commit_exists(git, project_root, base_rev):
+        return _unresolved_merge_request(
+            reason="merge_request_base_not_found",
+            base_rev=base_rev,
+            head_rev=head_rev,
+            on_nonlinear_push_without_base=on_nonlinear_push_without_base,
+        )
+    if not _commit_exists(git, project_root, head_rev):
+        return _unresolved_merge_request(
+            reason="merge_request_head_not_found",
+            base_rev=base_rev,
+            head_rev=head_rev,
+            on_nonlinear_push_without_base=on_nonlinear_push_without_base,
+        )
+
+    return DiffRange(
+        revision_spec=f"{base_rev}..{head_rev}",
+        strategy=strategy,
+        completeness="complete",
+        base_rev=base_rev,
+        head_rev=head_rev,
+    )
+
+
 def diff_range_for_env(
     *,
     git: str,
@@ -340,6 +431,18 @@ def diff_range_for_env(
             context_label="Push GitHub",
             pushed_branch=environ.get("GITHUB_REF_NAME"),
             base_ref=base_ref,
+            on_nonlinear_push_without_base=on_nonlinear_push_without_base,
+        )
+
+    pipeline_source = environ.get("CI_PIPELINE_SOURCE")
+    if pipeline_source == "merge_request_event":
+        return _resolve_ci_merge_request(
+            git=git,
+            project_root=project_root,
+            event_type=environ.get("CI_MERGE_REQUEST_EVENT_TYPE"),
+            diff_base_sha=environ.get("CI_MERGE_REQUEST_DIFF_BASE_SHA"),
+            commit_sha=environ.get("CI_COMMIT_SHA"),
+            source_branch_sha=environ.get("CI_MERGE_REQUEST_SOURCE_BRANCH_SHA"),
             on_nonlinear_push_without_base=on_nonlinear_push_without_base,
         )
 

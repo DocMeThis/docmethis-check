@@ -28,8 +28,13 @@ def _isolate_ci_environment(monkeypatch: pytest.MonkeyPatch) -> None:
         "GITHUB_SHA",
         "GITHUB_BEFORE_SHA",
         "GITHUB_EVENT_PATH",
+        "CI_PIPELINE_SOURCE",
         "CI_COMMIT_BEFORE_SHA",
         "CI_COMMIT_SHA",
+        "CI_COMMIT_BRANCH",
+        "CI_MERGE_REQUEST_DIFF_BASE_SHA",
+        "CI_MERGE_REQUEST_SOURCE_BRANCH_SHA",
+        "CI_MERGE_REQUEST_EVENT_TYPE",
     ):
         monkeypatch.delenv(variable, raising=False)
 

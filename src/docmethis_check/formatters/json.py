@@ -160,6 +160,10 @@ def _serialize_diff(result: CheckResult) -> dict[str, object] | None:
     }
     if result.diff_reason is not None:
         data["reason"] = result.diff_reason
+    if result.diff_base_rev is not None:
+        data["base_rev"] = result.diff_base_rev
+    if result.diff_head_rev is not None:
+        data["head_rev"] = result.diff_head_rev
     if result.diff_files:
         data["files"] = result.diff_files
     return data
