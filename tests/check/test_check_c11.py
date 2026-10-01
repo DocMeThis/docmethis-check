@@ -1,0 +1,255 @@
+# Copyright (c) 2026 DocMeThis SAS. All rights reserved.
+
+"""Phase 0 tests for GitLab merge request diff resolution."""
+
+from __future__ import annotations
+
+import json
+import subprocess
+from typing import TYPE_CHECKING
+
+import pytest
+
+from docmethis_check.formatters.json import format as format_json
+from docmethis_check.formatters.text import format as format_text
+from docmethis_check.git_diff import DiffRange, NoDiffBaseError, diff_range_for_env
+from docmethis_check.models import CheckResult
+from docmethis_check.runner import run_check
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+
+def _git(root: Path, *args: str) -> str:
+    """Run Git in a temporary repository and return stdout."""
+    outcome = subprocess.run(
+        ["git", *args],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return outcome.stdout.strip()
+
+
+def _commit(root: Path, message: str) -> str:
+    """Commit the current repository contents and return its SHA."""
+    _git(root, "add", ".")
+    _git(root, "commit", "-m", message)
+    return _git(root, "rev-parse", "HEAD")
+
+
+def _history(root: Path) -> tuple[str, str, str]:
+    """Create a base, source, and synthetic pipeline commit."""
+    _git(root, "init")
+    _git(root, "config", "user.email", "test@example.com")
+    _git(root, "config", "user.name", "C11")
+    module = root / "module.py"
+    module.write_text("value = 1\n", encoding="utf-8")
+    base_sha = _commit(root, "base")
+    module.write_text("value = 2\n", encoding="utf-8")
+    source_sha = _commit(root, "source")
+    module.write_text("value = 3\n", encoding="utf-8")
+    synthetic_sha = _commit(root, "synthetic merge result")
+    return base_sha, source_sha, synthetic_sha
+
+
+def _set_merge_request_environment(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    event_type: str | None,
+    base_sha: str | None,
+    commit_sha: str | None,
+    source_sha: str | None,
+    before_sha: str | None = None,
+) -> None:
+    """Configure the GitLab MR variables used by the resolver."""
+    monkeypatch.setenv("CI_PIPELINE_SOURCE", "merge_request_event")
+    if event_type is None:
+        monkeypatch.delenv("CI_MERGE_REQUEST_EVENT_TYPE", raising=False)
+    else:
+        monkeypatch.setenv("CI_MERGE_REQUEST_EVENT_TYPE", event_type)
+    if base_sha is None:
+        monkeypatch.delenv("CI_MERGE_REQUEST_DIFF_BASE_SHA", raising=False)
+    else:
+        monkeypatch.setenv("CI_MERGE_REQUEST_DIFF_BASE_SHA", base_sha)
+    if commit_sha is None:
+        monkeypatch.delenv("CI_COMMIT_SHA", raising=False)
+    else:
+        monkeypatch.setenv("CI_COMMIT_SHA", commit_sha)
+    if source_sha is None:
+        monkeypatch.delenv("CI_MERGE_REQUEST_SOURCE_BRANCH_SHA", raising=False)
+    else:
+        monkeypatch.setenv("CI_MERGE_REQUEST_SOURCE_BRANCH_SHA", source_sha)
+    if before_sha is None:
+        monkeypatch.delenv("CI_COMMIT_BEFORE_SHA", raising=False)
+    else:
+        monkeypatch.setenv("CI_COMMIT_BEFORE_SHA", before_sha)
+
+
+def test_detached_mr_uses_diff_base_and_commit_sha(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """A detached MR uses the GitLab diff base and checked-out commit."""
+    base_sha, source_sha, synthetic_sha = _history(tmp_path)
+    _set_merge_request_environment(
+        monkeypatch,
+        event_type="detached",
+        base_sha=base_sha,
+        commit_sha=source_sha,
+        source_sha=None,
+        before_sha=synthetic_sha,
+    )
+
+    outcome = diff_range_for_env(git="git", project_root=tmp_path)
+
+    assert outcome.revision_spec == f"{base_sha}..{source_sha}"
+    assert outcome.strategy == "gitlab_merge_request_diff_base"
+    assert outcome.completeness == "complete"
+    assert outcome.base_rev == base_sha
+    assert outcome.head_rev == source_sha
+
+
+def test_merged_result_uses_source_sha_not_synthetic_commit(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """A merged-result MR ignores the synthetic pipeline commit as HEAD."""
+    base_sha, source_sha, synthetic_sha = _history(tmp_path)
+    _set_merge_request_environment(
+        monkeypatch,
+        event_type="merged_result",
+        base_sha=base_sha,
+        commit_sha=synthetic_sha,
+        source_sha=source_sha,
+    )
+
+    outcome = diff_range_for_env(git="git", project_root=tmp_path)
+
+    assert outcome.revision_spec == f"{base_sha}..{source_sha}"
+    assert outcome.strategy == "gitlab_merged_result"
+    assert outcome.head_rev == source_sha
+    assert synthetic_sha not in outcome.revision_spec
+
+
+def test_merge_train_uses_source_sha_when_available(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """A merge train uses the source branch SHA when GitLab provides it."""
+    base_sha, source_sha, synthetic_sha = _history(tmp_path)
+    _set_merge_request_environment(
+        monkeypatch,
+        event_type="merge_train",
+        base_sha=base_sha,
+        commit_sha=synthetic_sha,
+        source_sha=source_sha,
+    )
+
+    outcome = diff_range_for_env(git="git", project_root=tmp_path)
+
+    assert outcome.revision_spec == f"{base_sha}..{source_sha}"
+    assert outcome.strategy == "gitlab_merge_train"
+    assert outcome.head_rev == source_sha
+
+
+@pytest.mark.parametrize("event_type", ["merged_result", "merge_train"])
+def test_source_sha_is_required_without_synthetic_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    event_type: str,
+) -> None:
+    """MR pipelines fail instead of silently analyzing a synthetic HEAD."""
+    base_sha, _source_sha, synthetic_sha = _history(tmp_path)
+    _set_merge_request_environment(
+        monkeypatch,
+        event_type=event_type,
+        base_sha=base_sha,
+        commit_sha=synthetic_sha,
+        source_sha=None,
+    )
+
+    with pytest.raises(NoDiffBaseError, match="missing merge request source branch sha"):
+        diff_range_for_env(git="git", project_root=tmp_path)
+
+
+def test_merge_train_missing_source_can_return_incomplete_result(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Warn mode reports an incomplete merge train without selecting CI_COMMIT_SHA."""
+    base_sha, _source_sha, synthetic_sha = _history(tmp_path)
+    _set_merge_request_environment(
+        monkeypatch,
+        event_type="merge_train",
+        base_sha=base_sha,
+        commit_sha=synthetic_sha,
+        source_sha=None,
+    )
+
+    outcome = diff_range_for_env(git="git", project_root=tmp_path, on_nonlinear_push_without_base="warn")
+
+    assert outcome.revision_spec is None
+    assert outcome.strategy == "gitlab_no_reliable_base"
+    assert outcome.completeness == "none"
+    assert outcome.reason == "missing_merge_request_source_branch_sha"
+    assert outcome.head_rev is None
+
+
+def test_missing_mr_base_does_not_fall_back_to_local_changes(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """An MR without a local base is incomplete rather than a working-tree diff."""
+    _base_sha, source_sha, _synthetic_sha = _history(tmp_path)
+    _set_merge_request_environment(
+        monkeypatch,
+        event_type="detached",
+        base_sha="0" * 40,
+        commit_sha=source_sha,
+        source_sha=None,
+    )
+
+    outcome = diff_range_for_env(git="git", project_root=tmp_path, on_nonlinear_push_without_base="warn")
+
+    assert outcome.revision_spec is None
+    assert outcome.strategy == "gitlab_no_reliable_base"
+    assert outcome.reason == "missing_merge_request_diff_base_sha"
+
+
+@pytest.mark.parametrize("event_type", [None, "unknown"])
+def test_unknown_mr_event_type_is_controlled(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, event_type: str | None) -> None:
+    """Unknown MR event types do not default to detached semantics."""
+    base_sha, source_sha, _synthetic_sha = _history(tmp_path)
+    _set_merge_request_environment(
+        monkeypatch,
+        event_type=event_type,
+        base_sha=base_sha,
+        commit_sha=source_sha,
+        source_sha=source_sha,
+    )
+
+    with pytest.raises(NoDiffBaseError, match="merge request event type"):
+        diff_range_for_env(git="git", project_root=tmp_path)
+
+
+def test_runner_and_formatters_expose_diff_revisions(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Resolved base/head revisions remain visible in the result contracts."""
+    expected = DiffRange(
+        revision_spec=None,
+        strategy="gitlab_no_reliable_base",
+        completeness="none",
+        reason="missing_merge_request_source_branch_sha",
+        base_rev="base",
+        head_rev="synthetic",
+    )
+    monkeypatch.setattr(
+        "docmethis_check.runner.discover_changed_python_files",
+        lambda *_args, **_kwargs: ([], expected),
+    )
+
+    result = run_check(tmp_path, write_cache=False)
+    assert result.diff_base_rev == "base"
+    assert result.diff_head_rev == "synthetic"
+
+    report = tmp_path / "report.json"
+    data = json.loads(format_json(result, file=str(report)))
+    assert data["diff"]["base_rev"] == "base"
+    assert data["diff"]["head_rev"] == "synthetic"
+
+    text = format_text(result, file=str(tmp_path / "report.txt"), verbose=True)
+    assert "base=base head=synthetic" in text
+
+
+def test_check_result_formatter_keeps_optional_revisions_optional(tmp_path: Path) -> None:
+    """Reports without resolved revisions keep the existing compact diff shape."""
+    report = tmp_path / "report.json"
+    data = json.loads(format_json(CheckResult(diff_strategy="explicit", diff_completeness="complete"), file=str(report)))
+
+    assert data["diff"] == {"strategy": "explicit", "completeness": "complete"}

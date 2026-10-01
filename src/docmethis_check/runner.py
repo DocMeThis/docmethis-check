@@ -363,6 +363,8 @@ def run_check(  # noqa: PLR0913 - public API; the parameter count is intentional
     result.diff_strategy = diff_range.strategy
     result.diff_completeness = diff_range.completeness
     result.diff_reason = diff_range.reason
+    result.diff_base_rev = diff_range.base_rev
+    result.diff_head_rev = diff_range.head_rev
     result.diff_files = [_changed_file_to_dict(changed_file) for changed_file in discovered_files_list]
 
     if diff_range.revision_spec is None:
