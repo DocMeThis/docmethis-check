@@ -87,6 +87,108 @@ def _set_merge_request_environment(
         monkeypatch.setenv("CI_COMMIT_BEFORE_SHA", before_sha)
 
 
+def _set_push_environment(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    before_sha: str,
+    commit_sha: str,
+    branch: str = "main",
+) -> None:
+    """Configure the GitLab push variables used by the resolver."""
+    monkeypatch.setenv("CI_PIPELINE_SOURCE", "push")
+    monkeypatch.setenv("CI_COMMIT_BEFORE_SHA", before_sha)
+    monkeypatch.setenv("CI_COMMIT_SHA", commit_sha)
+    monkeypatch.setenv("CI_COMMIT_BRANCH", branch)
+
+
+def _nonlinear_history(root: Path) -> tuple[str, str, str]:
+    """Create an ancestor, an old branch tip, and a rewritten branch tip."""
+    _git(root, "init")
+    _git(root, "config", "user.email", "test@example.com")
+    _git(root, "config", "user.name", "C11")
+    module = root / "module.py"
+    module.write_text("value = 1\n", encoding="utf-8")
+    ancestor_sha = _commit(root, "ancestor")
+    module.write_text("value = 2\n", encoding="utf-8")
+    previous_sha = _commit(root, "old branch")
+    _git(root, "checkout", "-b", "rewritten", ancestor_sha)
+    module.write_text("value = 3\n", encoding="utf-8")
+    head_sha = _commit(root, "rewritten branch")
+    return ancestor_sha, previous_sha, head_sha
+
+
+def test_gitlab_linear_push_uses_before_and_commit_sha(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """A linear GitLab push uses CI_COMMIT_BEFORE_SHA as its base."""
+    base_sha, head_sha, _synthetic_sha = _history(tmp_path)
+    _set_push_environment(monkeypatch, before_sha=base_sha, commit_sha=head_sha)
+
+    outcome = diff_range_for_env(git="git", project_root=tmp_path)
+
+    assert outcome.revision_spec == f"{base_sha}..{head_sha}"
+    assert outcome.strategy == "gitlab_linear_before_after"
+    assert outcome.completeness == "complete"
+
+
+def test_gitlab_first_push_with_zero_before_sha_is_explicitly_incomplete(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """A first push does not silently become a local working-tree diff."""
+    _base_sha, head_sha, _synthetic_sha = _history(tmp_path)
+    _set_push_environment(monkeypatch, before_sha="0" * 40, commit_sha=head_sha)
+
+    outcome = diff_range_for_env(git="git", project_root=tmp_path, on_nonlinear_push_without_base="warn")
+
+    assert outcome.revision_spec is None
+    assert outcome.strategy == "gitlab_no_reliable_base"
+    assert outcome.completeness == "none"
+    assert outcome.reason == "initial_branch_push_without_base"
+    assert outcome.head_rev == head_sha
+
+
+def test_gitlab_nonlinear_push_uses_common_ancestor(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """A rewritten GitLab push uses the common ancestor of its two tips."""
+    ancestor_sha, previous_sha, head_sha = _nonlinear_history(tmp_path)
+    _set_push_environment(monkeypatch, before_sha=previous_sha, commit_sha=head_sha, branch="rewritten")
+
+    outcome = diff_range_for_env(git="git", project_root=tmp_path)
+
+    assert outcome.revision_spec == f"{ancestor_sha}..{head_sha}"
+    assert outcome.strategy == "gitlab_nonlinear_before_after_merge_base"
+    assert outcome.completeness == "complete_relative_to_common_ancestor"
+
+
+def test_gitlab_nonlinear_push_prefers_configured_base_ref(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """A configured base ref selects the GitLab merge-base strategy."""
+    ancestor_sha, previous_sha, head_sha = _nonlinear_history(tmp_path)
+    _git(tmp_path, "update-ref", "refs/remotes/origin/main", previous_sha)
+    _set_push_environment(monkeypatch, before_sha=previous_sha, commit_sha=head_sha, branch="rewritten")
+
+    outcome = diff_range_for_env(git="git", project_root=tmp_path, base_ref="main")
+
+    assert outcome.revision_spec == f"{ancestor_sha}..{head_sha}"
+    assert outcome.strategy == "gitlab_nonlinear_merge_base"
+    assert outcome.completeness == "complete_relative_to_base"
+    assert outcome.reason == "before_sha_not_ancestor_of_sha"
+
+
+def test_gitlab_push_without_local_base_is_explicitly_incomplete(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """A missing GitLab push base is reported instead of guessed."""
+    _base_sha, head_sha, _synthetic_sha = _history(tmp_path)
+    _set_push_environment(monkeypatch, before_sha="1" * 40, commit_sha=head_sha)
+
+    outcome = diff_range_for_env(git="git", project_root=tmp_path, on_nonlinear_push_without_base="warn")
+
+    assert outcome.revision_spec is None
+    assert outcome.strategy == "gitlab_no_reliable_base"
+    assert outcome.completeness == "none"
+    assert outcome.reason == "nonlinear_push_without_base"
+    assert outcome.head_rev == head_sha
+
+
 def test_detached_mr_uses_diff_base_and_commit_sha(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """A detached MR uses the GitLab diff base and checked-out commit."""
     base_sha, source_sha, synthetic_sha = _history(tmp_path)
