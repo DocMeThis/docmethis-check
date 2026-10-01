@@ -7,8 +7,8 @@ requires-python = ">=3.12"
 license = "LicenseRef-DocMeThis-Source-Access"
 license-files = ["LICENSE"]
 dependencies = [
-    "docmethis-extract-python==0.1.0",
-    "docmethis-verify==0.1.0",
+    "docmethis-extract-python>=0.1.0",
+    "docmethis-verify>=0.1.0",
 ]
 
 [dependency-groups]

@@ -2,15 +2,21 @@ name: DocMeThis Fix
 
 on:
   workflow_dispatch:
+  push:
+    branches-ignore:
+      - main
 
-# Skeleton only. This workflow must be connected to the authenticated private
-# runtime distribution before enabling it for consumer pushes.
+env:
+  DOCMETHIS_FIX_VERSION: "0.1.0"
+
 permissions:
   contents: write
+  pull-requests: write
 
 jobs:
   fix:
-    name: Run private DocMeThis Fix runtime
+    name: DocMeThis Fix runtime
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout consumer repository
@@ -19,23 +25,58 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Pin private runtime by hash
-        env:
-          DOCMETHIS_FIX_DISTRIBUTION_TOKEN: ${{ secrets.DOCMETHIS_FIX_DISTRIBUTION_TOKEN }}
-          DOCMETHIS_FIX_RUNTIME_SHA: ${{ vars.DOCMETHIS_FIX_RUNTIME_SHA }}
-          DOCMETHIS_FIX_ARTIFACT_SHA256: ${{ vars.DOCMETHIS_FIX_ARTIFACT_SHA256 }}
+      - name: Install private Fix runtime
         run: |
           set -euo pipefail
-          test -n "$DOCMETHIS_FIX_DISTRIBUTION_TOKEN"
-          [[ "$DOCMETHIS_FIX_RUNTIME_SHA" =~ ^[0-9a-f]{40}$ ]]
-          [[ "$DOCMETHIS_FIX_ARTIFACT_SHA256" =~ ^[0-9a-f]{64}$ ]]
-          printf '%s\n' 'Private runtime installation is release-channel specific.'
-          printf 'Runtime commit SHA: %s\n' "$DOCMETHIS_FIX_RUNTIME_SHA"
-          printf 'Artifact SHA-256: %s\n' "$DOCMETHIS_FIX_ARTIFACT_SHA256"
-          printf '%s\n' 'Configure the authenticated installer before enabling this workflow.'
-          exit 1
+          venv="$RUNNER_TEMP/docmethis-fix-venv"
+          python -m venv "$venv"
+          "$venv/bin/python" -m pip install --upgrade pip
+          "$venv/bin/python" -m pip install \
+            --disable-pip-version-check \
+            --no-cache-dir \
+            --index-url https://pkg.docmethis.com \
+            --extra-index-url https://pypi.org/simple \
+            --only-binary=:all: \
+            "docmethis-fix==${DOCMETHIS_FIX_VERSION}"
+          echo "FIX_PYTHON=$venv/bin/python" >> "$GITHUB_ENV"
 
-      - name: Run Check and private Fix
+      - name: Prepare Gateway key
+        env:
+          FIX_API_KEY: ${{ secrets.DOCMETHIS_FIX_API_KEY }}
         run: |
-          printf '%s\n' 'Reserved for the exact private runtime contract.'
-          exit 1
+          set -euo pipefail
+          test -n "$FIX_API_KEY"
+          key_file="$RUNNER_TEMP/docmethis-fix-api-key"
+          umask 077
+          printf '%s' "$FIX_API_KEY" > "$key_file"
+          echo "DOCMETHIS_FIX_API_KEY_FILE=$key_file" >> "$GITHUB_ENV"
+
+      - name: Generate the Check hand-off
+        run: |
+          empty_tree="$(git hash-object -t tree /dev/null)"
+          set +e
+          "$FIX_PYTHON" -m docmethis_check . \
+            --git-diff "${empty_tree}..HEAD" \
+            --check-mode regression \
+            --base-ref main \
+            --no-cache \
+            --json-output-file rapport.json \
+            --on-nonlinear-push-without-base fail
+          status=$?
+          set -e
+          if [ "$status" -gt 1 ]; then
+            exit "$status"
+          fi
+          test -s rapport.json
+
+      - name: Apply eligible Fix corrections
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          "$FIX_PYTHON" -m docmethis_fix rapport.json --project-root . --pr > fix-result.json
+          cat fix-result.json
