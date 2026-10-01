@@ -16,6 +16,7 @@ from docmethis_check.config import (
     parse_symbol_kinds,
 )
 from docmethis_check.formatters.github import format as format_github
+from docmethis_check.formatters.gitlab import format as format_gitlab
 from docmethis_check.formatters.json import format as format_json
 from docmethis_check.formatters.text import format as format_text
 from docmethis_check.runner import run_check
@@ -94,6 +95,12 @@ def create_parser() -> argparse.ArgumentParser:
         type=Path,
         default=None,
         help="GitHub annotations output file (default: none)",
+    )
+    output_group.add_argument(
+        "--gitlab-output-file",
+        type=Path,
+        default=None,
+        help="GitLab Code Quality output file (default: none)",
     )
     output_group.add_argument(
         "--json-output-file",
@@ -204,15 +211,13 @@ def create_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _identical_output_files(github_output_file: Path | None, json_output_file: Path | None) -> bool:
-    """Return whether the two configured destinations refer to the same file.
+def _identical_output_files(*output_files: Path | None) -> bool:
+    """Return whether any configured destinations refer to the same file.
 
     Parameters
     ----------
-    github_output_file : Path | None
-        The path to the GitHub output file, or None if not configured.
-    json_output_file : Path | None
-        The path to the JSON output file, or None if not configured.
+    output_files : tuple[Path | None, ...]
+        Output paths to compare, with None values representing disabled outputs.
 
     Returns
     -------
@@ -220,11 +225,15 @@ def _identical_output_files(github_output_file: Path | None, json_output_file: P
         True if both files are configured and resolve to the same path, False otherwise.
 
     """
-    return (
-        github_output_file is not None
-        and json_output_file is not None
-        and github_output_file.resolve() == json_output_file.resolve()
-    )
+    resolved_files: set[Path] = set()
+    for output_file in output_files:
+        if output_file is None:
+            continue
+        resolved_file = output_file.resolve()
+        if resolved_file in resolved_files:
+            return True
+        resolved_files.add(resolved_file)
+    return False
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -246,8 +255,8 @@ def main(argv: list[str] | None = None) -> int:
     """
     parser = create_parser()
     args = parser.parse_args(argv)
-    if _identical_output_files(args.github_output_file, args.json_output_file):
-        parser.error("--github-output-file and --json-output-file must refer to different files.")
+    if _identical_output_files(args.github_output_file, args.gitlab_output_file, args.json_output_file):
+        parser.error("--github-output-file, --gitlab-output-file, and --json-output-file must refer to different files.")
 
     try:
         include_visibility = parse_include_visibility(args.include_visibility) if args.include_visibility else None
@@ -279,6 +288,14 @@ def main(argv: list[str] | None = None) -> int:
             config=config,
         )
 
+        if args.gitlab_output_file is not None:
+            format_gitlab(
+                result,
+                file=str(args.gitlab_output_file),
+                project_root=args.project.resolve(),
+                annotation_placement=config.annotation_placement,
+            )
+
         if args.json_output_file is not None:
             format_json(result, file=str(args.json_output_file))
 
@@ -289,7 +306,7 @@ def main(argv: list[str] | None = None) -> int:
                 annotation_placement=config.annotation_placement,
             )
 
-        if args.json_output_file is None and args.github_output_file is None:
+        if args.gitlab_output_file is None and args.json_output_file is None and args.github_output_file is None:
             if args.format == "json":
                 format_json(result)
             else:
