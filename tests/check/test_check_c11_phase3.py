@@ -33,3 +33,15 @@ def test_github_workflow_publishes_only_the_release_tag_and_digest() -> None:
     assert "IMAGE_DIGEST: ${{ steps.image.outputs.digest }}" in workflow
     assert "org.opencontainers.image.source=https://github.com/DocMeThis/docmethis-check" in workflow
     assert ":latest" not in workflow
+
+
+def test_github_workflow_checks_version_and_smoke_tests_the_published_digest() -> None:
+    """A release tag must match the package and the pushed image must run."""
+    root = Path(__file__).resolve().parents[2]
+    workflow = (root / ".github" / "workflows" / "publish-docker.yml").read_text(encoding="utf-8")
+
+    assert "tomllib" in workflow
+    assert "RELEASE_VERSION" in workflow
+    assert 'project_version" != "$RELEASE_VERSION"' in workflow
+    assert "IMAGE_REFERENCE: ${{ env.IMAGE_NAME }}@${{ steps.image.outputs.digest }}" in workflow
+    assert 'docker run --rm --entrypoint /bin/sh "$IMAGE_REFERENCE"' in workflow

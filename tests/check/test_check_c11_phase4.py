@@ -14,13 +14,25 @@ def _workflow() -> str:
 
 
 def test_workflow_avoids_duplicate_branch_and_merge_request_pipelines() -> None:
-    """An open MR takes the MR pipeline, not a concurrent branch pipeline."""
+    """The job rules prefer the MR pipeline without changing project globals."""
     workflow = _workflow()
 
+    assert workflow.startswith("docmethis_check:\n")
+    assert "workflow:" not in workflow
+    assert "stages:" not in workflow
     assert "if: '$CI_PIPELINE_SOURCE == \"merge_request_event\"'" in workflow
     assert "if: '$CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS'\n      when: never" in workflow
     assert "if: '$CI_COMMIT_BRANCH'" in workflow
     assert "- when: never" in workflow
+
+
+def test_synthetic_merge_jobs_check_out_the_source_snapshot() -> None:
+    """Merged-result and merge-train jobs align the workspace with the source SHA."""
+    workflow = _workflow()
+
+    assert 'CI_MERGE_REQUEST_EVENT_TYPE" = "merged_result"' in workflow
+    assert 'CI_MERGE_REQUEST_EVENT_TYPE" = "merge_train"' in workflow
+    assert 'git checkout --detach "$CI_MERGE_REQUEST_SOURCE_BRANCH_SHA"' in workflow
 
 
 def test_job_uses_the_versioned_image_and_keeps_git_history() -> None:

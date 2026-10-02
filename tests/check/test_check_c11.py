@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from docmethis_check.config import CheckConfig
 from docmethis_check.formatters.json import format as format_json
 from docmethis_check.formatters.text import format as format_text
 from docmethis_check.git_diff import DiffRange, NoDiffBaseError, diff_range_for_env
@@ -51,6 +52,37 @@ def _history(root: Path) -> tuple[str, str, str]:
     source_sha = _commit(root, "source")
     module.write_text("value = 3\n", encoding="utf-8")
     synthetic_sha = _commit(root, "synthetic merge result")
+    return base_sha, source_sha, synthetic_sha
+
+
+def _divergent_merge_history(root: Path) -> tuple[str, str, str]:
+    """Create divergent target/source commits and a synthetic merge snapshot."""
+    _git(root, "init")
+    _git(root, "config", "user.email", "test@example.com")
+    _git(root, "config", "user.name", "C11")
+    module = root / "module.py"
+    module.write_text(
+        'def changed() -> int:\n    """Returns the base value."""\n    return 1\n',
+        encoding="utf-8",
+    )
+    base_sha = _commit(root, "base")
+
+    _git(root, "checkout", "-b", "source", base_sha)
+    module.write_text("def changed() -> int:\n    return 2\n", encoding="utf-8")
+    source_sha = _commit(root, "source")
+
+    _git(root, "checkout", "-b", "target", base_sha)
+    (root / "target.py").write_text("value = 3\n", encoding="utf-8")
+    _commit(root, "target")
+    _git(root, "merge", "--no-ff", source_sha, "-m", "synthetic merge result")
+
+    module.write_text(
+        'def changed() -> int:\n    """Returns the merged value."""\n    return 2\n',
+        encoding="utf-8",
+    )
+    _git(root, "add", "module.py")
+    _git(root, "commit", "--amend", "--no-edit")
+    synthetic_sha = _git(root, "rev-parse", "HEAD")
     return base_sha, source_sha, synthetic_sha
 
 
@@ -267,8 +299,8 @@ def test_source_sha_is_required_without_synthetic_fallback(
         diff_range_for_env(git="git", project_root=tmp_path)
 
 
-def test_merge_train_missing_source_can_return_incomplete_result(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """Warn mode reports an incomplete merge train without selecting CI_COMMIT_SHA."""
+def test_merge_train_missing_source_fails_even_in_warn_mode(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """An incomplete merge train cannot be downgraded to a warning."""
     base_sha, _source_sha, synthetic_sha = _history(tmp_path)
     _set_merge_request_environment(
         monkeypatch,
@@ -278,17 +310,15 @@ def test_merge_train_missing_source_can_return_incomplete_result(monkeypatch: py
         source_sha=None,
     )
 
-    outcome = diff_range_for_env(git="git", project_root=tmp_path, on_nonlinear_push_without_base="warn")
-
-    assert outcome.revision_spec is None
-    assert outcome.strategy == "gitlab_no_reliable_base"
-    assert outcome.completeness == "none"
-    assert outcome.reason == "missing_merge_request_source_branch_sha"
-    assert outcome.head_rev is None
+    with pytest.raises(NoDiffBaseError, match="missing merge request source branch sha"):
+        diff_range_for_env(git="git", project_root=tmp_path, on_nonlinear_push_without_base="warn")
 
 
-def test_missing_mr_base_does_not_fall_back_to_local_changes(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """An MR without a local base is incomplete rather than a working-tree diff."""
+def test_missing_mr_base_fails_without_falling_back_to_local_changes(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """An MR without a local base cannot fall back to a working-tree diff."""
     _base_sha, source_sha, _synthetic_sha = _history(tmp_path)
     _set_merge_request_environment(
         monkeypatch,
@@ -298,11 +328,31 @@ def test_missing_mr_base_does_not_fall_back_to_local_changes(monkeypatch: pytest
         source_sha=None,
     )
 
-    outcome = diff_range_for_env(git="git", project_root=tmp_path, on_nonlinear_push_without_base="warn")
+    with pytest.raises(NoDiffBaseError, match="missing merge request diff base sha"):
+        diff_range_for_env(git="git", project_root=tmp_path, on_nonlinear_push_without_base="warn")
 
-    assert outcome.revision_spec is None
-    assert outcome.strategy == "gitlab_no_reliable_base"
-    assert outcome.reason == "missing_merge_request_diff_base_sha"
+
+def test_run_check_uses_source_snapshot_after_merged_result_checkout(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """A merged-result job checks out and analyzes the source branch snapshot."""
+    base_sha, source_sha, synthetic_sha = _divergent_merge_history(tmp_path)
+    _set_merge_request_environment(
+        monkeypatch,
+        event_type="merged_result",
+        base_sha=base_sha,
+        commit_sha=synthetic_sha,
+        source_sha=source_sha,
+    )
+
+    # This is the checkout performed by the GitLab reference job before invoking Check.
+    _git(tmp_path, "checkout", "--detach", source_sha)
+    result = run_check(tmp_path, write_cache=False, config=CheckConfig(dia=False))
+
+    assert result.diff_base_rev == base_sha
+    assert result.diff_head_rev == source_sha
+    assert [(check.code, check.symbol) for check in result.checks] == [("DMT-1120", "module.changed")]
 
 
 @pytest.mark.parametrize("event_type", [None, "unknown"])

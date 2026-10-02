@@ -7,18 +7,21 @@ the local CLI and GitHub integration.
 
 ## Quick Start
 
-Copy the reference job from the release of `docmethis-check` into the target
-repository as `.gitlab-ci.yml`:
+Add the reference job from the release of `docmethis-check` to the target
+repository's existing `.gitlab-ci.yml`:
 
 ```text
 https://github.com/DocMeThis/docmethis-check/blob/vX.Y.Z/.gitlab-ci.yml
 ```
 
 The repository copy is also available at
-[`../.gitlab-ci.yml`](../.gitlab-ci.yml). Keep that file as the canonical job
-definition instead of maintaining a second GitLab workflow by hand. The
-release file provided by the maintainers contains the official immutable image
-reference.
+[`../.gitlab-ci.yml`](../.gitlab-ci.yml). The file contains one job and keeps
+its rules and variables local to that job, so it does not replace the target
+project's pipeline-level configuration. The release file contains the official
+immutable image reference.
+
+The job uses GitLab's default `test` stage. If the target project declares a
+custom `stages` list, include `test` or assign the job to an existing stage.
 
 ## Image Access
 
@@ -44,14 +47,15 @@ runtime.
 
 ## Pipeline Rules
 
-The reference workflow uses these rules:
+The reference job uses these rules:
 
 - A pipeline with `CI_PIPELINE_SOURCE=merge_request_event` runs the MR job.
-- A branch pipeline with a non-empty `CI_OPEN_MERGE_REQUESTS` is suppressed.
+- The job is skipped in a branch pipeline with a non-empty `CI_OPEN_MERGE_REQUESTS`.
 - A branch without an open MR runs the branch job.
 - Other pipeline sources are not enabled by the reference job.
 
-This prevents a push to a branch with an open MR from running Check twice.
+This prevents this job from running twice for a branch with an open MR. Other
+jobs in the target pipeline keep their own rules.
 
 ## Git Checkout
 
@@ -77,16 +81,21 @@ git config --global --add safe.directory "$CI_PROJECT_DIR"
 avoids `dubious ownership` failures when the runner user and the image user do
 not have the same ownership metadata.
 
+For `merged_result` and `merge_train` pipelines, the job then checks out
+`CI_MERGE_REQUEST_SOURCE_BRANCH_SHA` before invoking Check. This keeps the
+source snapshot analyzed by the AST aligned with the source revision selected
+by the diff resolver; the synthetic merge commit remains pipeline metadata.
+
 ## GitLab Variables
 
 | Variable | Role |
 | --- | --- |
-| `CI_COMMIT_SHA` | Current commit for a push or detached MR pipeline. |
+| `CI_COMMIT_SHA` | Current commit for a push or detached MR pipeline; synthetic metadata for merged-result and merge-train pipelines. |
 | `CI_COMMIT_BEFORE_SHA` | Previous commit for a push; an all-zero value means no usable base. |
 | `CI_MERGE_REQUEST_DIFF_BASE_SHA` | Required MR base revision. |
-| `CI_MERGE_REQUEST_SOURCE_BRANCH_SHA` | Source branch HEAD for merged-result and merge-train pipelines. |
+| `CI_MERGE_REQUEST_SOURCE_BRANCH_SHA` | Source branch HEAD checked out for merged-result and merge-train pipelines. |
 | `CI_MERGE_REQUEST_EVENT_TYPE` | Identifies `detached`, `merged_result`, or `merge_train`. |
-| `CI_OPEN_MERGE_REQUESTS` | Used by the workflow rules to suppress duplicate branch pipelines. |
+| `CI_OPEN_MERGE_REQUESTS` | Used by the job rules to skip duplicate branch runs. |
 | `CI_PROJECT_DIR` | Absolute checkout path used by Git and the job. |
 | `GIT_DEPTH` | Checkout depth; `0` is the reliable default. |
 | `DOCMETHIS_CHECK_IMAGE` | Versioned image reference, overridable for an internal registry. |
@@ -101,12 +110,12 @@ replaces `CI_MERGE_REQUEST_DIFF_BASE_SHA` in an MR pipeline.
 | Push | `CI_COMMIT_BEFORE_SHA` | `CI_COMMIT_SHA` |
 | Detached MR | `CI_MERGE_REQUEST_DIFF_BASE_SHA` | `CI_COMMIT_SHA` |
 | Merged-result MR | `CI_MERGE_REQUEST_DIFF_BASE_SHA` | `CI_MERGE_REQUEST_SOURCE_BRANCH_SHA` |
-| Merge train | `CI_MERGE_REQUEST_DIFF_BASE_SHA` | `CI_MERGE_REQUEST_SOURCE_BRANCH_SHA` when available |
+| Merge train | `CI_MERGE_REQUEST_DIFF_BASE_SHA` | `CI_MERGE_REQUEST_SOURCE_BRANCH_SHA` |
 
 For a merged-result pipeline, `CI_COMMIT_SHA` can identify a synthetic merge
 commit and is deliberately not used as the source HEAD. A merge train without
-`CI_MERGE_REQUEST_SOURCE_BRANCH_SHA` is reported as incomplete or fails under
-the configured policy; it never silently falls back to the synthetic commit.
+`CI_MERGE_REQUEST_SOURCE_BRANCH_SHA` fails because an MR must have an exact
+source snapshot; it never silently falls back to the synthetic commit.
 
 For pushes, `CI_COMMIT_BEFORE_SHA` is used when it is a local ancestor of
 `CI_COMMIT_SHA`. A non-linear push uses a common ancestor when possible. The
@@ -130,23 +139,24 @@ The equivalent CLI options are `--base-ref`,
 configuration remains the source of policy for the GitLab job, while
 `DOCMETHIS_CHECK_IMAGE` is a CI variable rather than a Check policy setting.
 
-`on-nonlinear-push-without-base` accepts `fail`, `head_commit`, or `warn`:
+`on-nonlinear-push-without-base` accepts `fail`, `head_commit`, or `warn` for
+push pipelines:
 
 - `fail` blocks the job when no reliable base exists.
 - `head_commit` checks only the current commit's parent and marks the scope partial.
 - `warn` emits an incomplete-scope warning and skips analysis that requires a reliable range.
 
-`fail-on-warning` controls whether warnings, including an incomplete-scope
-warning, make the job fail. Errors and source-analysis failures remain
-blocking.
+`fail-on-warning` controls whether push warnings, including an incomplete-scope
+warning, make the job fail. MR resolution failures remain blocking regardless
+of this setting.
 
 See [`docs/options.md`](options.md) for the complete CLI and TOML option
 reference.
 
 ## Reports And Exit Codes
 
-The job writes both files and keeps them as artifacts even when Check returns a
-non-zero status:
+The job writes both files and keeps them as artifacts for completed Check runs,
+including runs with diagnostic non-zero statuses:
 
 ### `docmethis-report.json`
 

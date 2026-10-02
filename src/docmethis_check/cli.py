@@ -211,13 +211,15 @@ def create_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _identical_output_files(*output_files: Path | None) -> bool:
-    """Return whether any configured destinations refer to the same file.
+def _identical_output_files(github_output_file: Path | None, json_output_file: Path | None) -> bool:
+    """Return whether the two configured destinations refer to the same file.
 
     Parameters
     ----------
-    output_files : tuple[Path | None, ...]
-        Output paths to compare, with None values representing disabled outputs.
+    github_output_file : Path | None
+        The path to the first output file, or None if not configured.
+    json_output_file : Path | None
+        The path to the second output file, or None if not configured.
 
     Returns
     -------
@@ -225,15 +227,11 @@ def _identical_output_files(*output_files: Path | None) -> bool:
         True if both files are configured and resolve to the same path, False otherwise.
 
     """
-    resolved_files: set[Path] = set()
-    for output_file in output_files:
-        if output_file is None:
-            continue
-        resolved_file = output_file.resolve()
-        if resolved_file in resolved_files:
-            return True
-        resolved_files.add(resolved_file)
-    return False
+    return (
+        github_output_file is not None
+        and json_output_file is not None
+        and github_output_file.resolve() == json_output_file.resolve()
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -255,7 +253,11 @@ def main(argv: list[str] | None = None) -> int:
     """
     parser = create_parser()
     args = parser.parse_args(argv)
-    if _identical_output_files(args.github_output_file, args.gitlab_output_file, args.json_output_file):
+    if (
+        _identical_output_files(args.github_output_file, args.gitlab_output_file)
+        or _identical_output_files(args.github_output_file, args.json_output_file)
+        or _identical_output_files(args.gitlab_output_file, args.json_output_file)
+    ):
         parser.error("--github-output-file, --gitlab-output-file, and --json-output-file must refer to different files.")
 
     try:

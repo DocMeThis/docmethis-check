@@ -40,7 +40,30 @@ def format(  # noqa: A001
     project_root: Path | None = None,
     annotation_placement: AnnotationPlacement = AnnotationPlacement.SIGNATURE,
 ) -> str:
-    """Produce a GitLab Code Quality report."""
+    """Produce a GitLab Code Quality report.
+
+    Parameters
+    ----------
+    result : CheckResult
+        Check result containing the diagnostics to serialize.
+    file : str | None = None
+        Destination file for the report, or None to write the report to stdout.
+    project_root : Path | None = None
+        Project root used to validate and relativize finding paths.
+    annotation_placement : AnnotationPlacement = AnnotationPlacement.SIGNATURE
+        Location policy used to select each finding's annotated line.
+
+    Returns
+    -------
+    str
+        The serialized GitLab Code Quality JSON report.
+
+    Raises
+    ------
+    ValueError
+        If a finding path or severity cannot be represented by the GitLab report.
+
+    """
     records: list[tuple[tuple[str, ...], dict[str, object]]] = []
     for check in result.checks:
         relative_path = _relative_path(check.file, project_root)
@@ -72,7 +95,26 @@ def format(  # noqa: A001
 
 
 def _relative_path(path: str, project_root: Path | None) -> str:
-    """Return a validated POSIX path relative to the project root."""
+    """Return a validated POSIX path relative to the project root.
+
+    Parameters
+    ----------
+    path : str
+        Finding path to validate and normalize.
+    project_root : Path | None
+        Project root used to resolve absolute and relative finding paths.
+
+    Returns
+    -------
+    str
+        Validated POSIX path relative to the project root.
+
+    Raises
+    ------
+    ValueError
+        If the path is absolute without a root, empty, or outside the root.
+
+    """
     candidate = Path(path)
     if project_root is None:
         if candidate.is_absolute():
@@ -99,7 +141,24 @@ def _relative_path(path: str, project_root: Path | None) -> str:
 
 
 def _severity(check: CheckEntry) -> str:
-    """Map a Check severity to a GitLab Code Quality severity."""
+    """Map a Check severity to a GitLab Code Quality severity.
+
+    Parameters
+    ----------
+    check : CheckEntry
+        Diagnostic whose Check severity is converted.
+
+    Returns
+    -------
+    str
+        GitLab Code Quality severity.
+
+    Raises
+    ------
+    ValueError
+        If the Check severity has no GitLab mapping.
+
+    """
     try:
         return _SEVERITY_MAP[check.severity]
     except KeyError as exc:
@@ -108,7 +167,21 @@ def _severity(check: CheckEntry) -> str:
 
 
 def _fingerprint(check: CheckEntry, relative_path: str) -> str:
-    """Return a stable identity hash independent of rendered location and text."""
+    """Return a stable identity hash independent of rendered location and text.
+
+    Parameters
+    ----------
+    check : CheckEntry
+        Diagnostic whose canonical identity fields are hashed.
+    relative_path : str
+        Normalized project-relative path used as part of the identity.
+
+    Returns
+    -------
+    str
+        Hexadecimal SHA-256 fingerprint for the diagnostic identity.
+
+    """
     parts = []
     for label, attribute in _FINGERPRINT_FIELDS:
         value = relative_path if attribute == "relative_path" else getattr(check, attribute)
@@ -118,7 +191,23 @@ def _fingerprint(check: CheckEntry, relative_path: str) -> str:
 
 
 def _sort_key(check: CheckEntry, relative_path: str, line: int) -> tuple[str, int, str, str, str, str, str, str, str, str]:
-    """Return the deterministic ordering key for one finding."""
+    """Return the deterministic ordering key for one finding.
+
+    Parameters
+    ----------
+    check : CheckEntry
+        Diagnostic whose stable fields determine ordering.
+    relative_path : str
+        Normalized project-relative finding path.
+    line : int
+        Annotated source line for the finding.
+
+    Returns
+    -------
+    tuple[str, int, str, str, str, str, str, str, str, str]
+        Tuple used to sort findings deterministically.
+
+    """
     return (
         relative_path,
         line,
