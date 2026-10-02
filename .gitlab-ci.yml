@@ -1,4 +1,9 @@
-workflow:
+docmethis_check:
+  image:
+    # Replace this placeholder with the digest emitted by publish-docker.yml.
+    name: "$DOCMETHIS_CHECK_IMAGE"
+    entrypoint: [""]
+
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS'
@@ -6,23 +11,19 @@ workflow:
     - if: '$CI_COMMIT_BRANCH'
     - when: never
 
-stages:
-  - documentation
-
-variables:
-  # Replace this placeholder with the digest emitted by publish-docker.yml.
-  DOCMETHIS_CHECK_IMAGE: "ghcr.io/docmethis/docmethis-check@sha256:<release-digest>"
-  GIT_DEPTH: "0"
-
-docmethis_check:
-  image:
-    name: "$DOCMETHIS_CHECK_IMAGE"
-    entrypoint: [""]
-
-  stage: documentation
+  variables:
+    DOCMETHIS_CHECK_IMAGE: "ghcr.io/docmethis/docmethis-check@sha256:<release-digest>"
+    GIT_DEPTH: "0"
 
   before_script:
     - git config --global --add safe.directory "$CI_PROJECT_DIR"
+    - |
+      if [ "$CI_PIPELINE_SOURCE" = "merge_request_event" ] &&
+        { [ "$CI_MERGE_REQUEST_EVENT_TYPE" = "merged_result" ] ||
+          [ "$CI_MERGE_REQUEST_EVENT_TYPE" = "merge_train" ]; }
+      then
+        git checkout --detach "$CI_MERGE_REQUEST_SOURCE_BRANCH_SHA"
+      fi
 
   script:
     - >
