@@ -112,6 +112,12 @@ the built-in `github.token`. It does not open another pull request or run a
 post-check workflow; validation of the resulting commit remains the normal
 responsibility of the repository's CI. Fork pull requests are skipped.
 
+### GitLab CI
+
+Use the [GitLab CI guide](docs/gitlab-ci.md) to copy the official reference
+job. It runs Check from a versioned Docker image and publishes both the GitLab
+Code Quality projection and the complete DocMeThis JSON report.
+
 ### Local CLI
 
 The Check CLI requires Python 3.12+ and Git. The inspected project does not
