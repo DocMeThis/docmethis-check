@@ -251,21 +251,8 @@ def _resolve_ci_push(  # noqa: PLR0913
 def _unresolved_merge_request(
     *,
     reason: str,
-    base_rev: str | None,
-    head_rev: str | None,
-    on_nonlinear_push_without_base: str,
 ) -> DiffRange:
-    """Return or raise the controlled result for an unresolved GitLab MR."""
-    if on_nonlinear_push_without_base == "warn":
-        return DiffRange(
-            revision_spec=None,
-            strategy="gitlab_no_reliable_base",
-            completeness="none",
-            reason=reason,
-            base_rev=base_rev,
-            head_rev=head_rev,
-        )
-
+    """Raise a controlled error for an unresolved GitLab MR."""
     msg = f"GitLab merge request diff is unavailable: {reason.replace('_', ' ')}."
     raise NoDiffBaseError(msg)
 
@@ -278,7 +265,6 @@ def _resolve_ci_merge_request(  # noqa: PLR0913
     diff_base_sha: str | None,
     commit_sha: str | None,
     source_branch_sha: str | None,
-    on_nonlinear_push_without_base: str,
 ) -> DiffRange:
     """Resolve the exact source diff for a GitLab merge request pipeline."""
     strategies = {
@@ -290,9 +276,6 @@ def _resolve_ci_merge_request(  # noqa: PLR0913
         reason = "missing_merge_request_event_type" if not event_type else "unknown_merge_request_event_type"
         return _unresolved_merge_request(
             reason=reason,
-            base_rev=None,
-            head_rev=None,
-            on_nonlinear_push_without_base=on_nonlinear_push_without_base,
         )
 
     strategy, head_sha = strategies[event_type]
@@ -302,32 +285,20 @@ def _resolve_ci_merge_request(  # noqa: PLR0913
     if base_rev is None:
         return _unresolved_merge_request(
             reason="missing_merge_request_diff_base_sha",
-            base_rev=None,
-            head_rev=head_rev,
-            on_nonlinear_push_without_base=on_nonlinear_push_without_base,
         )
     if head_rev is None:
         reason = "missing_merge_request_source_branch_sha" if event_type != "detached" else "missing_merge_request_commit_sha"
         return _unresolved_merge_request(
             reason=reason,
-            base_rev=base_rev,
-            head_rev=None,
-            on_nonlinear_push_without_base=on_nonlinear_push_without_base,
         )
 
     if not _commit_exists(git, project_root, base_rev):
         return _unresolved_merge_request(
             reason="merge_request_base_not_found",
-            base_rev=base_rev,
-            head_rev=head_rev,
-            on_nonlinear_push_without_base=on_nonlinear_push_without_base,
         )
     if not _commit_exists(git, project_root, head_rev):
         return _unresolved_merge_request(
             reason="merge_request_head_not_found",
-            base_rev=base_rev,
-            head_rev=head_rev,
-            on_nonlinear_push_without_base=on_nonlinear_push_without_base,
         )
 
     return DiffRange(
@@ -443,7 +414,6 @@ def diff_range_for_env(
             diff_base_sha=environ.get("CI_MERGE_REQUEST_DIFF_BASE_SHA"),
             commit_sha=environ.get("CI_COMMIT_SHA"),
             source_branch_sha=environ.get("CI_MERGE_REQUEST_SOURCE_BRANCH_SHA"),
-            on_nonlinear_push_without_base=on_nonlinear_push_without_base,
         )
 
     gitlab_before = environ.get("CI_COMMIT_BEFORE_SHA")
