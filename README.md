@@ -104,6 +104,12 @@ The workflow downloads your project and runs Check on every pull request. It
 keeps the project's history so Check can compare the version you are submitting
 with the previous version.
 
+### GitLab CI
+
+Use the [GitLab CI guide](docs/gitlab-ci.md) to copy the official reference
+job. It runs Check from a versioned Docker image and publishes both the GitLab
+Code Quality projection and the complete DocMeThis JSON report.
+
 ### Local CLI
 
 The Check CLI requires Python 3.12+ and Git. The inspected project does not
