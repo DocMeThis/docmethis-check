@@ -764,7 +764,12 @@ def _format_verbose_report_metadata(result: CheckResult) -> list[str]:
     lines: list[str] = []
     if result.diff_strategy is not None:
         completeness = result.diff_completeness or "unknown"
-        lines.append(f"Diff: strategy={_ascii(result.diff_strategy)} completeness={_ascii(completeness)}")
+        line = f"Diff: strategy={_ascii(result.diff_strategy)} completeness={_ascii(completeness)}"
+        if result.diff_base_rev is not None:
+            line += f" base={_ascii(result.diff_base_rev)}"
+        if result.diff_head_rev is not None:
+            line += f" head={_ascii(result.diff_head_rev)}"
+        lines.append(line)
     if result.regression_filter_completeness is not None:
         line = f"Regression filter: {_ascii(result.regression_filter_completeness)}"
         if result.regression_filter_reason:

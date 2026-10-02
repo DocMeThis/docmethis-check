@@ -289,6 +289,7 @@ def test_git_diff_resolves_first_gitlab_pipeline_without_base(monkeypatch: pytes
 
     monkeypatch.setenv("CI_COMMIT_BEFORE_SHA", "0" * 40)
     monkeypatch.setenv("CI_COMMIT_SHA", sha)
+    monkeypatch.setenv("CI_PIPELINE_SOURCE", "push")
 
     with pytest.raises(NoDiffBaseError):
         diff_range_for_env(git="git", project_root=tmp_path, git_diff=None)
