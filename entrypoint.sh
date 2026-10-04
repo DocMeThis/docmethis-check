@@ -6,6 +6,7 @@ fail_on_warning=""
 include_visibility=""
 profile=""
 base_ref=""
+git_diff=""
 on_nonlinear_push_without_base=""
 check_mode=""
 annotation_placement=""
@@ -33,6 +34,10 @@ while [ "$#" -gt 0 ]; do
       ;;
     --base-ref)
       base_ref="${2:-}"
+      shift 2
+      ;;
+    --git-diff)
+      git_diff="${2:-}"
       shift 2
       ;;
     --on-nonlinear-push-without-base)
@@ -95,6 +100,10 @@ fi
 
 if [ -n "$base_ref" ]; then
   set -- "$@" --base-ref "$base_ref"
+fi
+
+if [ -n "$git_diff" ]; then
+  set -- "$@" --git-diff "$git_diff"
 fi
 
 if [ -n "$on_nonlinear_push_without_base" ]; then

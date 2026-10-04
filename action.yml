@@ -18,6 +18,9 @@ inputs:
   base-ref:
     description: "Reference branch used to calculate the diff (for example, main)"
     required: false
+  git-diff:
+    description: "Explicit Git revision range used to calculate the diff"
+    required: false
   on-missing-base:
     description: "Behavior when a changed file's base Git snapshot is unavailable after diff resolution: emit_all or fail. Empty uses the default."
     required: false
@@ -51,6 +54,8 @@ runs:
     - "${{ inputs.profile }}"
     - "--base-ref"
     - "${{ inputs.base-ref }}"
+    - "--git-diff"
+    - "${{ inputs.git-diff }}"
     - "--on-missing-base"
     - "${{ inputs.on-missing-base }}"
     - "--on-nonlinear-push-without-base"
