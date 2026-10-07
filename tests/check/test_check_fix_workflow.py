@@ -68,7 +68,7 @@ def test_workflow_keeps_credentials_and_push_permissions_explicit() -> None:
     assert "persist-credentials: true" in workflow
     assert "cancel-in-progress: false" in workflow
     assert "OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}" in workflow
-    assert "OPENCODE_API_KEY" not in workflow
+    assert "OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}" in workflow
     assert "DOCMETHIS_GITHUB_TOKEN" not in workflow
     assert "DocMeThis-Fix: true" not in workflow
     assert "gh workflow run" not in workflow

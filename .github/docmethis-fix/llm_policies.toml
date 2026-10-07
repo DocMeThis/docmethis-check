@@ -3,7 +3,7 @@
 # ============================================================
 
 [fix.default]
-model = "cohere/north-mini-code:free"
+model = "deepseek-v4.1-flash"
 max_attempts = 3
 timeout_seconds = 30.0
 token_budget = 3000
