@@ -86,6 +86,9 @@ jobs:
           steps.check.outputs.status == '0' || steps.check.outputs.status == '1'
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          # F18 : type du compte propriétaire du dépôt de base de la PR, recoupé
+          # par Fix avec GITHUB_EVENT_PATH.
+          DOCMETHIS_FIX_ACCOUNT_TYPE: ${{ github.event.pull_request.base.repo.owner.type }}
         run: |
           set -uo pipefail
           git config user.name "github-actions[bot]"

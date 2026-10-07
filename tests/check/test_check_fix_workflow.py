@@ -46,6 +46,15 @@ def test_workflow_hands_check_findings_to_fix_on_the_existing_pr() -> None:
     assert "\n            --pr " not in workflow
 
 
+def test_workflow_transmits_the_base_repository_account_type() -> None:
+    """F18: the base repository owner type is passed to Fix, never a user-set value."""
+    workflow = _workflow()
+
+    assert "DOCMETHIS_FIX_ACCOUNT_TYPE: ${{ github.event.pull_request.base.repo.owner.type }}" in workflow
+    assert "vars.DOCMETHIS_FIX_ACCOUNT_TYPE" not in workflow
+    assert "secrets.DOCMETHIS_FIX_ACCOUNT_TYPE" not in workflow
+
+
 def test_workflow_keeps_credentials_and_push_permissions_explicit() -> None:
     """Gateway and provider credentials are runtime inputs with source push access."""
     workflow = _workflow()
