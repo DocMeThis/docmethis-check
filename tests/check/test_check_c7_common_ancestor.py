@@ -54,9 +54,13 @@ def _isolate_environment(monkeypatch: pytest.MonkeyPatch) -> None:
         "GITHUB_REF_NAME",
         "GITHUB_SHA",
         "GITHUB_WORKSPACE",
+        "CI_PIPELINE_SOURCE",
         "CI_COMMIT_BEFORE_SHA",
         "CI_COMMIT_BRANCH",
         "CI_COMMIT_SHA",
+        "CI_MERGE_REQUEST_DIFF_BASE_SHA",
+        "CI_MERGE_REQUEST_SOURCE_BRANCH_SHA",
+        "CI_MERGE_REQUEST_EVENT_TYPE",
     ):
         monkeypatch.delenv(variable, raising=False)
 
@@ -270,6 +274,7 @@ def test_missing_ancestor_warn_produces_annotations_and_json(
         "strategy": "github_no_reliable_base",
         "completeness": "none",
         "reason": "nonlinear_push_without_base",
+        "head_rev": new_sha,
     }
     assert data["checks"] == []
 

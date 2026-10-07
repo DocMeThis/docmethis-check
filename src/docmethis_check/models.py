@@ -284,6 +284,10 @@ class CheckResult:
         Serialized changed files with their affected lines.
     impact_analysis : ImpactAnalysis | None
         DIA impact analysis block, when enabled and available.
+    diff_base_rev : str | None
+        Resolved diff base revision, when known.
+    diff_head_rev : str | None
+        Resolved diff head revision, when known.
 
     """
 
@@ -299,3 +303,5 @@ class CheckResult:
     regression_filter_reason: str | None = None
     diff_files: list[dict[str, object]] = field(default_factory=list)
     impact_analysis: ImpactAnalysis | None = None
+    diff_base_rev: str | None = None
+    diff_head_rev: str | None = None

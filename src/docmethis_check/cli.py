@@ -16,6 +16,7 @@ from docmethis_check.config import (
     parse_symbol_kinds,
 )
 from docmethis_check.formatters.github import format as format_github
+from docmethis_check.formatters.gitlab import format as format_gitlab
 from docmethis_check.formatters.json import format as format_json
 from docmethis_check.formatters.text import format as format_text
 from docmethis_check.runner import run_check
@@ -94,6 +95,12 @@ def create_parser() -> argparse.ArgumentParser:
         type=Path,
         default=None,
         help="GitHub annotations output file (default: none)",
+    )
+    output_group.add_argument(
+        "--gitlab-output-file",
+        type=Path,
+        default=None,
+        help="GitLab Code Quality output file (default: none)",
     )
     output_group.add_argument(
         "--json-output-file",
@@ -210,9 +217,9 @@ def _identical_output_files(github_output_file: Path | None, json_output_file: P
     Parameters
     ----------
     github_output_file : Path | None
-        The path to the GitHub output file, or None if not configured.
+        The path to the first output file, or None if not configured.
     json_output_file : Path | None
-        The path to the JSON output file, or None if not configured.
+        The path to the second output file, or None if not configured.
 
     Returns
     -------
@@ -246,8 +253,12 @@ def main(argv: list[str] | None = None) -> int:
     """
     parser = create_parser()
     args = parser.parse_args(argv)
-    if _identical_output_files(args.github_output_file, args.json_output_file):
-        parser.error("--github-output-file and --json-output-file must refer to different files.")
+    if (
+        _identical_output_files(args.github_output_file, args.gitlab_output_file)
+        or _identical_output_files(args.github_output_file, args.json_output_file)
+        or _identical_output_files(args.gitlab_output_file, args.json_output_file)
+    ):
+        parser.error("--github-output-file, --gitlab-output-file, and --json-output-file must refer to different files.")
 
     try:
         include_visibility = parse_include_visibility(args.include_visibility) if args.include_visibility else None
@@ -279,6 +290,14 @@ def main(argv: list[str] | None = None) -> int:
             config=config,
         )
 
+        if args.gitlab_output_file is not None:
+            format_gitlab(
+                result,
+                file=str(args.gitlab_output_file),
+                project_root=args.project.resolve(),
+                annotation_placement=config.annotation_placement,
+            )
+
         if args.json_output_file is not None:
             format_json(result, file=str(args.json_output_file))
 
@@ -289,7 +308,7 @@ def main(argv: list[str] | None = None) -> int:
                 annotation_placement=config.annotation_placement,
             )
 
-        if args.json_output_file is None and args.github_output_file is None:
+        if args.gitlab_output_file is None and args.json_output_file is None and args.github_output_file is None:
             if args.format == "json":
                 format_json(result)
             else:
