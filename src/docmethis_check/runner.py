@@ -357,6 +357,7 @@ def run_check(  # noqa: PLR0913 - public API; the parameter count is intentional
     dia_changed_files_list = [
         changed_file for changed_file in changed_files_list if not path_matches_filters(changed_file.path, root, dia_filters)
     ]
+    dia_context_files_list = discovered_files_list
     changed_files = {changed_file.path: changed_file for changed_file in changed_files_list}
 
     result = CheckResult()
@@ -379,7 +380,7 @@ def run_check(  # noqa: PLR0913 - public API; the parameter count is intentional
             root,
             skip_dynamic=True,
             write_cache=write_cache,
-            raw_records=raw_records if configuration.dia and (dia_changed_files_list or not discovered_files_list) else None,
+            raw_records=raw_records if configuration.dia and (dia_context_files_list or not discovered_files_list) else None,
         )
     finally:
         # Parse failures are rendered in the report instead of leaking as a separate warning line.
@@ -390,12 +391,13 @@ def run_check(  # noqa: PLR0913 - public API; the parameter count is intentional
     _execute_file_diagnostics(files_by_module, affected_symbols, result, ctx)
 
     if configuration.dia:
-        if dia_changed_files_list or not discovered_files_list:
+        if dia_context_files_list or not discovered_files_list:
             _execute_dia(
                 result,
                 project=project_record,
                 raw_records=raw_records,
-                diff_files=dia_changed_files_list,
+                diff_files=dia_context_files_list,
+                emission_files=dia_changed_files_list,
                 base_rev=diff_range.base_rev,
                 root=root,
                 configuration=configuration,
@@ -451,6 +453,7 @@ def _execute_dia(  # noqa: PLR0913
     project: ProjectRecord,
     raw_records: list[ModuleRecord],
     diff_files: list[ChangedFile],
+    emission_files: list[ChangedFile],
     base_rev: str | None,
     root: Path,
     configuration: CheckConfig,
@@ -466,7 +469,9 @@ def _execute_dia(  # noqa: PLR0913
     raw_records : list[ModuleRecord]
         A list of module records representing the raw project modules to be used as input for the documentation impact analysis.
     diff_files : list[ChangedFile]
-        A list of changed files to be used as input for the documentation impact analysis.
+        All changed files used to reconstruct DIA context and call graphs.
+    emission_files : list[ChangedFile]
+        Changed files eligible to receive DIA/API findings after path filters.
     base_rev : str | None
         The base revision against which documentation impact analysis is performed; may be None to indicate no base revision.
     root : Path
@@ -479,6 +484,7 @@ def _execute_dia(  # noqa: PLR0913
         project_head=project,
         raw_records=raw_records,
         diff_files=diff_files,
+        emission_files=emission_files,
         base_rev=base_rev,
         project_root=root,
         check_config=configuration,
