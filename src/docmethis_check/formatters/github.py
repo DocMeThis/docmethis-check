@@ -288,7 +288,20 @@ def _format_check(check: CheckEntry, annotation_placement: AnnotationPlacement) 
 
 
 def _format_analysis_error(error: dict[str, str]) -> str:
-    """Convert one source-analysis failure into a file-level error."""
+    """Convert one source-analysis failure into a file-level error.
+
+    Parameters
+    ----------
+    error : dict[str, str]
+        A dictionary mapping string keys to string values that carries the details of a single source-analysis failure, including
+        fields such as the affected file, the error type, and the error message.
+
+    Returns
+    -------
+    str
+        Return the formatted GitHub Actions error annotation string for the given source-analysis failure.
+
+    """
     file = _escape_property(_relativize(error.get("file", "")))
     error_type = error.get("type", "analysis_error")
     message = f"{error_type}: {error.get('message', 'Unable to analyze the file.')}"
