@@ -91,10 +91,11 @@ documentation debt stays out of the way.
 Copy the [ready-to-use workflow](https://github.com/DocMeThis/docmethis-check/blob/main/.github/workflows/docmethis-check.yml) into
 `.github/workflows/` in your repository. It checks documentation consistency,
 adds GitHub annotations, and never invokes Fix. A separate
-[Fix workflow](https://github.com/DocMeThis/docmethis-check/blob/main/.github/workflows/docmethis-fix.yml)
-is triggered by internal pull requests and requires the private runtime, Fix
-configuration, Gateway key, provider credentials, and a write-capable GitHub
-token.
+[Fix workflow wrapper](https://github.com/DocMeThis/docmethis-check/blob/main/.github/workflows/docmethis-fix.yml)
+is triggered by internal pull requests. It only delegates to the official
+reusable workflow `DocMeThis/docmethis-fix/.github/workflows/fix.yml`, pinned by
+full SHA, which requires the private runtime, Fix configuration, Gateway key,
+provider credentials, and a write-capable GitHub App token brokered by Gateway.
 
 > **Security note:** This workflow uses `@main`, so it follows the latest code
 > on the DocMeThis Check `main` branch. This is useful for testing the action
