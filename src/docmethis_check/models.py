@@ -268,8 +268,8 @@ class CheckResult:
     checked_files : list[str]
         Paths of the files that were checked.
     analysis_errors : list[dict[str, str]]
-        Text-only analysis failures for files that could not be checked. These
-        are intentionally excluded from the canonical JSON v1 payload.
+        Analysis failures for files that could not be checked. They are
+        published separately from diagnostic checks in machine-readable output.
     diff_strategy : str | None
         Strategy used to resolve the diff range, when known.
     diff_completeness : str | None
