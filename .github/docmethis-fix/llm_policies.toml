@@ -14,5 +14,4 @@ structured_output_mode = "guided_json"
 temperature = 0.6
 seed = 0
 max_tokens = 2000
-no_thinking = true
 reasoning_effort = "none"
