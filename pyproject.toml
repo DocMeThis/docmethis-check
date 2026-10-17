@@ -7,8 +7,8 @@ requires-python = ">=3.12"
 license = "LicenseRef-DocMeThis-Source-Access"
 license-files = ["LICENSE"]
 dependencies = [
-    "docmethis-extract-python>=0.1.0",
-    "docmethis-verify>=0.1.0",
+    "docmethis-extract-python>=0.1.1",
+    "docmethis-verify>=0.1.1",
 ]
 
 [dependency-groups]
@@ -56,7 +56,11 @@ markers = ["docker: test requiring Docker (skipped locally without RUN_DOCKER_TE
 
 [tool.ruff.lint]
 select = ["ALL"]
-ignore = ["D203", "D213", "D401", "COM812"]
+ignore = ["D401", "COM812"]
+# D401: multilingual prose; COM812: handled by ruff format.
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["S101", "S108", "S603", "S607", "PLR2004", "PLR0913", "ANN201", "FBT001", "SLF001", "D102", "D103", "ANN003"]
