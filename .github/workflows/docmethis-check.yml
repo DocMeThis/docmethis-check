@@ -44,6 +44,9 @@ jobs:
 
       - name: Check documentation consistency
         uses: *docmethis_check_action
+        with:
+          # The published Check used by Fix does not support the TOML key yet.
+          no-cache: "true"
         env:
           GITHUB_BEFORE_SHA: ${{ github.event.before }}
 

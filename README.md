@@ -391,8 +391,11 @@ source-analysis failures, or warnings made blocking by `fail-on-warning`, and
 `2` for invocation, configuration, Git, output, or other execution errors.
 
 Check writes `.docmethis_cache.json` by default to speed up extraction. The
-cache is safe to delete and should stay out of Git. `--no-cache` ignores an
-existing cache and performs no cache read or write.
+cache is safe to delete and should stay out of Git. Set `no-cache = true` under
+`[tool.docmethis.check]`, use the Action input `no-cache: true`, or pass
+`--no-cache` to ignore the existing cache and perform no cache read or write.
+Use `no-cache = false` in TOML, `--cache` on the CLI, or the Action input
+`no-cache: false` to explicitly re-enable it.
 
 ## Adapters
 
