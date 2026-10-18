@@ -17,8 +17,8 @@ from docmethis_extract_python.api import (
     analyze_project,
     effective_visibility,
     iter_functions,
-    load_configuration,
 )
+from docmethis_extract_python.api import load_configuration as load_extraction_configuration
 
 from docmethis_check.config import CheckConfig, load_check_config, path_matches_filters
 from docmethis_check.dia import _analyze_documentation_impacts, _base_head_models
@@ -291,11 +291,12 @@ def _module_visibility_from_name(module_name: str) -> Visibility:
     return Visibility.PUBLIC
 
 
-def run_check(  # noqa: PLR0913 - public API; the parameter count is intentional.
+def run_check(  # noqa: PLR0913 - public orchestration API.
     project: str | Path,
     git_diff: str | None = None,
     *,
-    write_cache: bool = True,
+    write_cache: bool | None = None,
+    read_cache: bool | None = None,
     base_ref: str | None = None,
     on_nonlinear_push_without_base: str | None = None,
     config: CheckConfig | None = None,
@@ -309,8 +310,10 @@ def run_check(  # noqa: PLR0913 - public API; the parameter count is intentional
     git_diff : str | None = None
         Optional Git diff string used to determine which Python files have changed. If not provided, the diff is derived from the
         configured base reference.
-    write_cache : bool = True
-        Whether to write the cache used during project analysis.
+    write_cache : bool | None = None
+        Whether to write the extraction cache. If None, follows the Check configuration.
+    read_cache : bool | None = None
+        Whether to read the extraction cache. If None, follows the Check configuration.
     base_ref : str | None = None
         Base ref to use for determining changed Python files; overrides the configured base ref when provided. If None, the
         configured base ref is used.
@@ -331,7 +334,7 @@ def run_check(  # noqa: PLR0913 - public API; the parameter count is intentional
     root = Path(project).resolve()
     configuration = config or load_check_config(root)
     extraction_configuration = replace(
-        load_configuration(root),
+        load_extraction_configuration(root),
         exception_analysis_depth=configuration.exception_analysis_depth,
         exception_documentation_depth=configuration.exception_documentation_depth,
     )
@@ -342,6 +345,8 @@ def run_check(  # noqa: PLR0913 - public API; the parameter count is intentional
         if on_nonlinear_push_without_base is not None
         else configuration.on_nonlinear_push_without_base
     )
+    effective_write_cache = not configuration.no_cache if write_cache is None else write_cache
+    effective_read_cache = not configuration.no_cache if read_cache is None else read_cache
 
     discovered_files_list, diff_range = discover_changed_python_files(
         root,
@@ -378,11 +383,13 @@ def run_check(  # noqa: PLR0913 - public API; the parameter count is intentional
     previous_parser_level = parser_logger.level
     parser_logger.setLevel(logging.ERROR)
     try:
+        if not effective_read_cache:
+            extraction_configuration = replace(extraction_configuration, full_reanalysis=True)
         project_record = analyze_project(
             root,
             configuration=extraction_configuration,
             skip_dynamic=True,
-            write_cache=write_cache,
+            write_cache=effective_write_cache,
             raw_records=raw_records if configuration.dia and (dia_context_files_list or not discovered_files_list) else None,
         )
     finally:

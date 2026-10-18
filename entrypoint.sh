@@ -9,6 +9,7 @@ base_ref=""
 git_diff=""
 on_nonlinear_push_without_base=""
 check_mode=""
+no_cache=""
 annotation_placement=""
 on_missing_base=""
 exclude_paths=""
@@ -50,6 +51,10 @@ while [ "$#" -gt 0 ]; do
       ;;
     --check-mode)
       check_mode="${2:-}"
+      shift 2
+      ;;
+    --no-cache)
+      no_cache="${2:-}"
       shift 2
       ;;
     --annotation-placement)
@@ -125,6 +130,13 @@ fi
 if [ -n "$check_mode" ]; then
   set -- "$@" --check-mode "$check_mode"
 fi
+
+case "$no_cache" in
+  true) set -- "$@" --no-cache ;;
+  false) set -- "$@" --cache ;;
+  "") ;;
+  *) echo "no-cache must be 'true' or 'false'" >&2; exit 2 ;;
+esac
 
 if [ -n "$annotation_placement" ]; then
   set -- "$@" --annotation-placement "$annotation_placement"

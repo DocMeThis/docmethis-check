@@ -84,10 +84,28 @@ def test_help_exposes_c9_output_options() -> None:
     output_help = raw_help.split("Output and execution:", 1)[1].split("Check policy:", 1)[0]
     assert [
         output_help.index(option)
-        for option in ("--ascii", "--color", "--format", "--github-output-file", "--json-output-file", "--no-cache", "--verbose")
+        for option in (
+            "--ascii",
+            "--color",
+            "--format",
+            "--github-output-file",
+            "--json-output-file",
+            "--no-cache",
+            "--cache",
+            "--verbose",
+        )
     ] == sorted(
         output_help.index(option)
-        for option in ("--ascii", "--color", "--format", "--github-output-file", "--json-output-file", "--no-cache", "--verbose")
+        for option in (
+            "--ascii",
+            "--color",
+            "--format",
+            "--github-output-file",
+            "--json-output-file",
+            "--no-cache",
+            "--cache",
+            "--verbose",
+        )
     )
 
     policy_help = raw_help.split("Check policy:", 1)[1]
