@@ -48,6 +48,7 @@ _CHECK_OPTION_KEYS = frozenset(
         "fail-on-warning",
         "include-visibility",
         "method-exception-contract",
+        "no-cache",
         "on-missing-base",
         "on-nonlinear-push-without-base",
         "profile",
@@ -235,6 +236,8 @@ class CheckConfig:
         Behavior when a nonlinear push has no reliable base.
     check_mode : CheckMode
         Check verification mode.
+    no_cache : bool
+        Whether extraction cache reads and writes are disabled for this run.
     annotation_placement : AnnotationPlacement
         Where type annotations are placed in generated documentation.
     on_missing_base : OnMissingBase
@@ -275,6 +278,7 @@ class CheckConfig:
     base_ref: str | None = None
     on_nonlinear_push_without_base: str = "fail"
     check_mode: CheckMode = CheckMode.REGRESSION
+    no_cache: bool = False
     annotation_placement: AnnotationPlacement = AnnotationPlacement.SIGNATURE
     on_missing_base: OnMissingBase = OnMissingBase.EMIT_ALL
     dia: bool = True
@@ -304,6 +308,7 @@ class CheckConfig:
         )
         type_check(value=self.fail_on_warning, expected_alias_type=StrictBool, field="fail_on_warning")
         type_check(value=self.dia, expected_alias_type=StrictBool, field="dia")
+        type_check(value=self.no_cache, expected_alias_type=StrictBool, field="no_cache")
         object.__setattr__(self, "severity", _validate_severity_mapping(self.severity, field="severity"))
         profile = _normalize_profile(self.profile)
         object.__setattr__(self, "profile", profile)
@@ -371,7 +376,7 @@ class CheckConfig:
         return self.severity.get(code, _PROFILES[self.profile].get(code, default))
 
 
-def load_check_config(  # noqa: C901, PLR0913
+def load_check_config(  # noqa: C901, PLR0912, PLR0913
     project_root: str | Path,
     *,
     fail_on_warning: bool | None = None,
@@ -384,6 +389,7 @@ def load_check_config(  # noqa: C901, PLR0913
     on_missing_base: str | None = None,
     method_exception_contract: str | None = None,
     dia: bool | None = None,
+    no_cache: bool | None = None,
     exclude_paths: tuple[str, ...] | None = None,
     dia_exclude_paths: tuple[str, ...] | None = None,
 ) -> CheckConfig:
@@ -431,6 +437,8 @@ def load_check_config(  # noqa: C901, PLR0913
     dia : bool | None = None
         Whether to enable diagnostic annotations (dia). When set to True, diagnostic annotations are enabled; when False, they are
         disabled. If None, the value from the configuration file is used.
+    no_cache : bool | None = None
+        Whether to disable extraction cache reads and writes. If None, the value from the configuration file is used.
     exclude_paths : tuple[str, ...] | None = None
         Project-relative files or directory prefixes to exclude from Check and DIA. When None, the values from the configuration
         file are used.
@@ -461,6 +469,7 @@ def load_check_config(  # noqa: C901, PLR0913
         base_ref=_read_str(section, "base-ref"),
         on_nonlinear_push_without_base=_read_str(section, "on-nonlinear-push-without-base", default="fail"),
         check_mode=_read_check_mode(section),
+        no_cache=_read_bool(section, "no-cache", default=False),
         annotation_placement=_read_enum(
             section, "annotation-placement", enum_type=AnnotationPlacement, default=AnnotationPlacement.SIGNATURE
         ),
@@ -521,6 +530,9 @@ def load_check_config(  # noqa: C901, PLR0913
 
     if dia is not None:
         config = replace(config, dia=dia)
+
+    if no_cache is not None:
+        config = replace(config, no_cache=no_cache)
 
     if exclude_paths is not None:
         config = replace(config, exclude_paths=exclude_paths)

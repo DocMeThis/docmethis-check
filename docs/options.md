@@ -274,7 +274,9 @@ stay out of Git.
 The cache is enabled by default because reusing unchanged extraction records
 can make repeated CI and local runs faster. Disable it when a full reanalysis
 is required or when the workspace must remain unchanged. `no-cache` defaults
-to `false`; use the CLI flag `--cache` to override a configured `true` value.
+to `false`; set `no-cache = true` in TOML or the Action input, or use
+`--no-cache`. Set `no-cache = false` in TOML, use `--cache` on the CLI, or set
+the Action input to `no-cache: false` to override a configured `true` value.
 
 ## Check Policy
 

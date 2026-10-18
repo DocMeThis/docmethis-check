@@ -16,6 +16,9 @@ import pytest
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from docmethis_extract_python.api import ConfigurationDocmethis
+
+from docmethis_check import runner
 from docmethis_check.config import CheckConfig, load_check_config
 from docmethis_check.formatters.json import format as format_json
 from docmethis_check.git_diff import (
@@ -171,7 +174,7 @@ def test_cli_clean_repository_creates_cache_without_diagnostics(tmp_path: Path) 
 
 
 def test_cli_no_cache_disables_cache_write(tmp_path: Path) -> None:
-    """--no-cache prevents writing the cache artifact."""
+    """--no-cache neither reads nor writes the extraction cache."""
     _initialize_repo(tmp_path)
     _write_module(
         tmp_path,
@@ -191,6 +194,44 @@ def test_cli_no_cache_disables_cache_write(tmp_path: Path) -> None:
 
     assert outcome.returncode == 0
     assert not (tmp_path / ".docmethis_cache.json").exists()
+
+
+def test_configured_no_cache_bypasses_existing_cache_and_preserves_it(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """TOML no-cache forces a full reanalysis without touching an existing cache."""
+    _initialize_repo(tmp_path)
+    source = _write_module(
+        tmp_path,
+        """
+        def function() -> int:
+            return 1
+        """,
+    )
+    _commit(tmp_path, "initial")
+    run_check(tmp_path)
+    cache_path = tmp_path / ".docmethis_cache.json"
+    original_cache = cache_path.read_bytes()
+    original_mtime = cache_path.stat().st_mtime_ns
+
+    (tmp_path / "pyproject.toml").write_text("[tool.docmethis.check]\nno-cache = true\n", encoding="utf-8")
+    source.write_text('def function() -> int:\n    """Returns a value."""\n    return 1\n', encoding="utf-8")
+    _commit(tmp_path, "add documentation")
+    analyze = runner.analyze_project
+    observations: dict[str, object] = {}
+
+    def _record_analysis(root: Path, configuration: ConfigurationDocmethis, **kwargs: object) -> object:
+        observations["full_reanalysis"] = configuration.full_reanalysis
+        observations["write_cache"] = kwargs["write_cache"]
+        return analyze(root, configuration=configuration, **kwargs)
+
+    monkeypatch.setattr(runner, "analyze_project", _record_analysis)
+    run_check(tmp_path)
+
+    assert observations == {"full_reanalysis": True, "write_cache": False}
+    assert cache_path.read_bytes() == original_cache
+    assert cache_path.stat().st_mtime_ns == original_mtime
 
 
 def test_cli_outside_git_repository_requires_explicit_range(tmp_path: Path) -> None:

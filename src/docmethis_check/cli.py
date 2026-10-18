@@ -101,10 +101,19 @@ def create_parser() -> argparse.ArgumentParser:
         default=None,
         help="Canonical JSON report output file (default: none)",
     )
-    output_group.add_argument(
+    cache_group = output_group.add_mutually_exclusive_group()
+    cache_group.add_argument(
         "--no-cache",
+        dest="no_cache",
         action="store_true",
-        help="Disable writing .docmethis_cache.json for this run (default: cache enabled)",
+        default=None,
+        help="Disable reading and writing .docmethis_cache.json (default: configuration)",
+    )
+    cache_group.add_argument(
+        "--cache",
+        dest="no_cache",
+        action="store_false",
+        help="Enable the extraction cache, overriding configuration",
     )
     output_group.add_argument(
         "--verbose",
@@ -267,13 +276,13 @@ def main(argv: list[str] | None = None) -> int:
             on_missing_base=args.on_missing_base,
             method_exception_contract=args.method_exception_contract,
             dia=args.dia,
+            no_cache=args.no_cache,
             exclude_paths=exclude_paths,
             dia_exclude_paths=dia_exclude_paths,
         )
         result = run_check(
             project=args.project,
             git_diff=args.git_diff,
-            write_cache=not args.no_cache,
             base_ref=args.base_ref,
             on_nonlinear_push_without_base=args.on_nonlinear_push_without_base,
             config=config,
