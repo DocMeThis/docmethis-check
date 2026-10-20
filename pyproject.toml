@@ -88,6 +88,7 @@ patterns = [
     "src/docmethis_check/defaults/",
     "tests/test_public_contract.py",
     "tests/check/test_check_c0.py",
+    "tests/check/test_check_c12_normal_return.py",
     "tests/check/test_check_c2.py",
     "tests/check/test_check_c8.py",
     "tests/check/test_check_c9_phase0.py",

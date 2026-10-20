@@ -2,6 +2,13 @@
 
 Notable user-facing changes for DocMeThis Check.
 
+## [0.1.2] - 2026-10-20
+
+### Added
+
+- `DMT-3013` reports a resolved value-return annotation when Extract proves that the function has no normal return path.
+- Severity profiles and per-code overrides support `DMT-3013`.
+
 ## [0.1.1] - 2026-09-25
 
 ### Added

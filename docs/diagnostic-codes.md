@@ -126,6 +126,27 @@ docstring, is not currently supported by Fix.
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | **`DMT-3001`** | Return value is undocumented. | **function**, **method** | **public**, protected, private | warning | **error** | error | ✓ |
 | **`DMT-3010`** | Return type is absent from the docstring. | **function**, **method** | **public**, protected, private | disabled | **warning** | error | ✓ |
+| **`DMT-3013`** | Return annotation permits a value, but no normal return path is detected. | **function**, **method** | **public**, protected, private | disabled | **warning** | error | - |
+
+Verify determines whether `DMT-3010` applies to an existing `Returns` section.
+It does not request a type when normal return is proven absent or the annotation
+resolves to `None`, `Never` or `NoReturn`. Check forwards Extract's module context
+for alias resolution and applies the configured severity to applicable findings;
+an override cannot activate an inapplicable finding.
+
+`DMT-3013` (`TDV-PY-3013`) is emitted only when Extract proves that no normal return path is
+reachable and Verify classifies the declared return annotation as a value or a
+nullable value. This is a control-flow observation, not a claim that the Python
+annotation is invalid. Decorated functions and unsupported control flow remain
+unknown and are not reported.
+
+When a function intentionally never returns normally, `typing.Never` or
+`typing.NoReturn` (including resolved aliases from `typing_extensions`) expresses
+that contract to type checkers; Check does not report those annotations. An
+ordinary value annotation remains valid Python even if the implementation
+always raises. In that case, either change the annotation to `Never`/`NoReturn`
+or add the intended normal return path. Fix leaves source signatures unchanged
+and reports this finding for manual correction.
 
 ### 4xxx - Exceptions
 

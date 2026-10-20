@@ -93,6 +93,15 @@ def _class(source_file: Path, docstring: str, *, methods: list[FunctionRecord] |
     )
 
 
+def test_class_summary_finding_carries_the_section_required_by_fix(tmp_path: Path) -> None:
+    """A class Summary correction uses the same public metadata as function findings."""
+    record = _class(tmp_path / "module.py", "Notes\n-----\nExisting class details.", methods=[])
+    entries, _ = diagnostics_for_class(record, CheckConfig(severity={"DMT-7001": "warning"}), file="module.py")
+    summary = next(entry for entry in entries if entry.code == "DMT-7001")
+    assert summary.section == "Summary"
+    assert summary.docstring_sha256 is not None
+
+
 def test_class_reports_missing_summary_when_dmt500_enabled(tmp_path: Path) -> None:
     """DMT-7001 reports a class docstring without a summary when enabled."""
     class_ = _class(
