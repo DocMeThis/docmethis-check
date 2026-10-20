@@ -23,6 +23,7 @@ from docmethis_extract_python.api import (
     Confidence,
     FunctionRecord,
     MethodType,
+    NormalReturnStatus,
     Provenance,
     TypeInfo,
     Visibility,
@@ -34,7 +35,12 @@ from docmethis_extract_python.api import (
     iter_functions,
     resolve_module_name,
 )
-from docmethis_verify import VerificationErrorType, VerificationRequest
+from docmethis_verify import (
+    ReturnAnnotationKind,
+    VerificationErrorType,
+    VerificationRequest,
+    classify_return_annotation,
+)
 from docmethis_verify.dmt import (
     CODE_BY_WARNING_KIND,
     DMT_1101,
@@ -47,6 +53,7 @@ from docmethis_verify.dmt import (
     DMT_2120,
     DMT_3001,
     DMT_3010,
+    DMT_3013,
     DMT_4001,
     DMT_4301,
     DMT_7001,
@@ -89,6 +96,7 @@ _MESSAGE_CLASS_WITHOUT_SUMMARY = "Class docstring '{qualified_name}' has no usab
 _MESSAGE_MODULE_WITHOUT_SUMMARY = "Module docstring '{module_name}' has no usable summary"
 _MESSAGE_UNDOCUMENTED_CLASS_EXCEPTION = "Exception exposed by class methods is not documented in class Raises: {exception_type}"
 _MESSAGE_MISSING_RETURNS_SECTION = "Return is not documented (type '{type_str}')"
+_MESSAGE_NO_NORMAL_RETURN_PATH = "No normal return path is detected for function annotated '{annotation}'."
 _MESSAGE_IGNORED_INTERNAL_VERIFY = "Internal verification diagnostic ignored by docmethis_check: %s"
 
 _DOWNSTREAM_DIAGNOSTICS_BY_SECTION: dict[str, frozenset[str]] = {
@@ -357,7 +365,13 @@ def produce_diagnostics(
     for func in iter_functions([module_record]):
         class_visibility = class_visibilities.get(func.qualified_name, Visibility.PUBLIC)
         visibility = effective_visibility(module_visibility, effective_visibility(class_visibility, func.visibility))
-        e, k = diagnostics_for_function(func, config, file=file, effective_visibility=visibility)
+        e, k = diagnostics_for_function(
+            func,
+            config,
+            file=file,
+            effective_visibility=visibility,
+            module_record=module_record,
+        )
         entries.extend(e)
         keys.update(k)
 
@@ -490,6 +504,7 @@ def _add_missing_module_summary(
             col_start=1,
             message=_MESSAGE_MODULE_WITHOUT_SUMMARY.format(module_name=module.module_name),
             symbol_kind=SymbolKind.MODULE,
+            section="Summary",
             docstring_line=module.docstring_line_start,
             annotation_line=module.docstring_line_start,
             docstring_sha256=emission.docstring_sha256,
@@ -663,6 +678,7 @@ def _add_missing_class_summary(
             col_start=1,
             message=_MESSAGE_CLASS_WITHOUT_SUMMARY.format(qualified_name=class_record.qualified_name),
             symbol_kind=SymbolKind.CLASS,
+            section="Summary",
             docstring_line=class_record.docstring_line_start,
             annotation_line=class_record.docstring_line_start,
             docstring_sha256=emission.docstring_sha256,
@@ -944,6 +960,7 @@ def diagnostics_for_function(
     *,
     file: str | None = None,
     effective_visibility: Visibility | None = None,
+    module_record: ModuleRecord | None = None,
 ) -> tuple[list[CheckEntry], Counter[DiagnosticKey]]:
     """Run checks on one function and return diagnostics and keys.
 
@@ -961,6 +978,9 @@ def diagnostics_for_function(
         Optional override for the function's visibility. When provided, this value is used instead of the function's own
         visibility when checking whether the function should be included based on the configured visibility filters. Defaults to
         None, meaning the function's actual visibility is used.
+    module_record : ModuleRecord | None = None
+        Module context used to resolve typing imports and locally declared return types. Without it, ambiguous return names remain
+        unknown.
 
     Returns
     -------
@@ -985,6 +1005,16 @@ def diagnostics_for_function(
         return entries, keys
 
     target_file = file or str(func.file_path)
+    annotation = func.signature.return_annotation if func.signature is not None else None
+    if func.signature is None and func.types is not None and func.types.return_type is not None:
+        return_info = func.types.return_type
+        if return_info.confidence is Confidence.EXPLICIT and return_info.provenance in {
+            Provenance.ANNOTATION,
+            Provenance.STUB,
+        }:
+            annotation = return_info.raw or return_info.type_str
+    return_annotation_kind = classify_return_annotation(annotation, module=module_record)
+    no_normal_return = func.normal_return_status is NormalReturnStatus.PROVEN_ABSENT
 
     docstring = (func.existing_docstring or "").strip()
     if not docstring:
@@ -1038,6 +1068,7 @@ def diagnostics_for_function(
         generated_docstring=generated,
         function_record=func,
         forbidden_terms=config.forbidden_terms,
+        module_record=module_record,
     )
     response = verify_docstring(request)
     emission = _DiagnosticEmissionContext(
@@ -1050,8 +1081,18 @@ def diagnostics_for_function(
         keys=keys,
     )
     corrected_sections = _corrected_sections_from_warnings(response.warnings)
+    _add_no_normal_return_path(
+        annotation=annotation,
+        annotation_kind=return_annotation_kind,
+        emission=emission,
+        func=func,
+    )
     _add_missing_return_section(
-        _return_type_to_document(func),
+        _return_type_to_document(
+            func,
+            annotation_kind=return_annotation_kind,
+            no_normal_return=no_normal_return,
+        ),
         returns_absent=returns is None,
         emission=emission,
         corrected_sections=corrected_sections,
@@ -1831,13 +1872,86 @@ def _extract_module_record_snapshot(content: str, relative_path: str) -> ModuleR
         )
 
 
-def _return_type_to_document(func: FunctionRecord) -> TypeInfo | None:
+def _add_no_normal_return_path(
+    *,
+    annotation: str | None,
+    annotation_kind: ReturnAnnotationKind,
+    emission: _DiagnosticEmissionContext,
+    func: FunctionRecord,
+) -> None:
+    """Emit DMT-3013 only when Extract proves no normal return path.
+
+    Parameters
+    ----------
+    annotation : str | None
+        Declared return annotation, when present.
+    annotation_kind : ReturnAnnotationKind
+        Classification of the annotation using module import context.
+    emission : _DiagnosticEmissionContext
+        Diagnostic target and output context.
+    func : FunctionRecord
+        Extracted function record carrying the normal-return status.
+
+    """
+    if func.normal_return_status is not NormalReturnStatus.PROVEN_ABSENT:
+        return
+    if annotation_kind not in {ReturnAnnotationKind.VALUE, ReturnAnnotationKind.NULLABLE} or annotation is None:
+        return
+
+    severity = emission.config.severity_for(DMT_3013, _default_severity(DMT_3013))
+    if _is_severity_disabled(severity):
+        return
+
+    key = DiagnosticKey(
+        code=DMT_3013,
+        file=emission.file,
+        symbol=func.qualified_name,
+        expected=annotation,
+        observed=func.normal_return_status.value,
+        accessor_kind=_property_accessor_kind(func),
+        visibility=emission.visibility.value,
+    )
+    emission.entries.append(
+        CheckEntry(
+            severity=severity,
+            code=DMT_3013,
+            symbol=func.qualified_name,
+            file=emission.file,
+            line_start=func.line_start,
+            col_start=1,
+            message=_MESSAGE_NO_NORMAL_RETURN_PATH.format(annotation=annotation),
+            symbol_kind=_function_symbol_kind(func),
+            accessor_kind=_property_accessor_kind(func),
+            visibility=emission.visibility.value,
+            line_end=func.line_end,
+            col_end=func.col_end,
+            annotation_line=func.line_start,
+            expected=annotation,
+            observed=func.normal_return_status.value,
+            error_type="NormalReturnPathAbsent",
+            docstring_sha256=emission.docstring_sha256,
+            diagnostic_key=key,
+        ),
+    )
+    emission.keys[key] += 1
+
+
+def _return_type_to_document(
+    func: FunctionRecord,
+    *,
+    annotation_kind: ReturnAnnotationKind,
+    no_normal_return: bool,
+) -> TypeInfo | None:
     """Return the explicit return type that should appear in the docstring.
 
     Parameters
     ----------
     func : FunctionRecord
         The function record to inspect for an explicit return type to include in the docstring.
+    annotation_kind : ReturnAnnotationKind
+        Classified return annotation; no-return and None annotations do not describe a produced value.
+    no_normal_return : bool
+        Whether Extract proved that the function has no normal return path.
 
     Returns
     -------
@@ -1847,6 +1961,12 @@ def _return_type_to_document(func: FunctionRecord) -> TypeInfo | None:
 
     """
     if func.types is None or func.types.return_type is None:
+        return None
+    if no_normal_return or annotation_kind in {
+        ReturnAnnotationKind.UNANNOTATED,
+        ReturnAnnotationKind.NONE,
+        ReturnAnnotationKind.NO_RETURN,
+    }:
         return None
     return_type = func.types.return_type
     if return_type.confidence is not Confidence.EXPLICIT:

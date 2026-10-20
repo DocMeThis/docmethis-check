@@ -54,6 +54,15 @@ def test_module_with_summary_reports_nothing(tmp_path: Path) -> None:
     assert not keys
 
 
+def test_module_summary_finding_carries_the_section_required_by_fix(tmp_path: Path) -> None:
+    """The canonical report must identify the Summary section rather than only its internal key."""
+    module = _module(tmp_path / "module.py", "Notes\n-----\nExisting module details.")
+    entries, _ = diagnostics_for_module(module, _config_module({"DMT-7001": "warning"}), file="module.py")
+    assert len(entries) == 1
+    assert entries[0].section == "Summary"
+    assert entries[0].docstring_sha256 is not None
+
+
 def test_module_missing_summary_is_disabled_in_loose_profile(tmp_path: Path) -> None:
     """A missing summary is disabled by the low-noise profile."""
     module = _module(
