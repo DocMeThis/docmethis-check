@@ -953,7 +953,27 @@ def _read_severities(section: dict[str, object]) -> dict[str, Severity]:
 
 
 def _validate_severity_mapping(value: object, *, field: str) -> dict[str, Severity]:
-    """Validate severity overrides against the Check diagnostic contract."""
+    """Validate severity overrides against the Check diagnostic contract.
+
+    Parameters
+    ----------
+    value : object
+        The dictionary to validate.
+    field : str
+        Label used in error messages to identify the field being validated.
+
+    Returns
+    -------
+    dict[str, Severity]
+        Returns a dict mapping diagnostic codes to Severity values.
+
+    Raises
+    ------
+    TypeError
+        Explicitly raised. Raised when not isinstance(value, dict).
+    ValueError
+        Explicitly raised.
+    """
     if not isinstance(value, dict):
         msg = f"{field} must be a TOML table."
         raise TypeError(msg)
