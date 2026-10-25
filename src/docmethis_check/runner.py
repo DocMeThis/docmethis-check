@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 
@@ -17,10 +17,11 @@ from docmethis_extract_python.api import (
     analyze_project,
     effective_visibility,
     iter_functions,
+    load_configuration,
 )
 
 from docmethis_check.config import CheckConfig, load_check_config, path_matches_filters
-from docmethis_check.dia import _analyze_documentation_impacts
+from docmethis_check.dia import _analyze_documentation_impacts, _base_head_models
 from docmethis_check.diagnostics import base_classes, base_diagnostics, base_functions, diagnostics_for_file
 from docmethis_check.git_diff import ChangedFile, DiffRange, discover_changed_python_files
 from docmethis_check.models import CheckEntry, CheckMode, CheckResult, ImpactAnalysis, Severity, SymbolKind
@@ -58,6 +59,8 @@ class _DiagnosticContext:
     diff_range: DiffRange
     root: Path
     base_snapshot_cache: dict[tuple[str, Path], BaseSnapshot | None] = field(default_factory=dict)
+    head_project: ProjectRecord | None = None
+    base_project: ProjectRecord | None = None
 
 
 @dataclass
@@ -334,6 +337,11 @@ def run_check(  # noqa: PLR0913 - public API; the parameter count is intentional
     """
     root = Path(project).resolve()
     configuration = config or load_check_config(root)
+    extraction_configuration = replace(
+        load_configuration(root),
+        exception_analysis_depth=configuration.exception_analysis_depth,
+        exception_documentation_depth=configuration.exception_documentation_depth,
+    )
 
     effective_base_ref = base_ref or configuration.base_ref
     effective_on_nonlinear = (
@@ -378,9 +386,10 @@ def run_check(  # noqa: PLR0913 - public API; the parameter count is intentional
     try:
         project_record = analyze_project(
             root,
+            configuration=extraction_configuration,
             skip_dynamic=True,
             write_cache=write_cache,
-            raw_records=raw_records if configuration.dia and (dia_context_files_list or not discovered_files_list) else None,
+            raw_records=raw_records,
         )
     finally:
         # Parse failures are rendered in the report instead of leaking as a separate warning line.
@@ -388,7 +397,12 @@ def run_check(  # noqa: PLR0913 - public API; the parameter count is intentional
 
     ctx = _DiagnosticContext(configuration=configuration, diff_range=diff_range, root=root)
     affected_symbols, files_by_module = _collect_affected_symbols(project_record, changed_files, ctx)
-    _execute_file_diagnostics(files_by_module, affected_symbols, result, ctx)
+    ctx.head_project = ProjectRecord(project_root=root, project_name=project_record.project_name, modules=raw_records)
+    with _base_head_models(
+        project_record, raw_records, discovered_files_list, diff_range.base_rev, root, extraction_configuration
+    ) as models:
+        ctx.base_project = models.base if models.completeness != "inconclusive" else None
+        _execute_file_diagnostics(files_by_module, affected_symbols, result, ctx)
 
     if configuration.dia:
         if dia_context_files_list or not discovered_files_list:
@@ -686,7 +700,9 @@ def _execute_file_diagnostics(
         except OSError:
             continue
 
-        head_entries, head_keys = diagnostics_for_file(head_content, path, ctx.root, ctx.configuration)
+        head_entries, head_keys = diagnostics_for_file(
+            head_content, path, ctx.root, ctx.configuration, analysis_project=ctx.head_project
+        )
         base_result = _get_base_keys(path, ctx, base_keys_cache)
         if base_result.regression_filter_signal is not None and result.regression_filter_completeness is None:
             result.regression_filter_completeness = base_result.regression_filter_signal.completeness
@@ -750,6 +766,7 @@ def _get_base_keys(
         ctx.root,
         ctx.configuration,
         snapshot_cache=ctx.base_snapshot_cache,
+        analysis_project=ctx.base_project,
     )
     if base_result is not None:
         _, base_keys = base_result

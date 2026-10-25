@@ -21,14 +21,17 @@ if TYPE_CHECKING:
 
 from docmethis_extract_python.api import (
     Confidence,
+    ConfigurationDocmethis,
     FunctionRecord,
     MethodType,
     NormalReturnStatus,
+    ProjectRecord,
     Provenance,
     TypeInfo,
     Visibility,
+    analyze_project,
+    apply_project_passes,
     effective_visibility,
-    exception_escapes,
     extract_module_record,
     is_stub_file,
     is_test_file,
@@ -40,6 +43,7 @@ from docmethis_verify import (
     VerificationErrorType,
     VerificationRequest,
     classify_return_annotation,
+    documentable_exceptions,
 )
 from docmethis_verify.dmt import (
     CODE_BY_WARNING_KIND,
@@ -781,10 +785,8 @@ def _class_exceptions_to_document(emission: _ClassDiagnosticEmissionContext) -> 
         accessor_kind = _property_accessor_kind(method)
         if accessor_kind is not None and accessor_kind not in {accessor.value for accessor in emission.config.property_accessors}:
             continue
-        for exception in method.exceptions or []:
+        for exception in documentable_exceptions(method, depth=emission.config.exception_documentation_depth):
             if exception.provenance is Provenance.CALLGRAPH_PROPAGATION:
-                continue
-            if not exception_escapes(method, exception):
                 continue
             normalized_name = _simple_exception_name(exception.exception_type)
             if normalized_name in seen:
@@ -1069,6 +1071,7 @@ def diagnostics_for_function(
         function_record=func,
         forbidden_terms=config.forbidden_terms,
         module_record=module_record,
+        exception_documentation_depth=config.exception_documentation_depth,
     )
     response = verify_docstring(request)
     emission = _DiagnosticEmissionContext(
@@ -1540,6 +1543,8 @@ def diagnostics_for_file(
     file: Path,
     project_root: Path,
     config: CheckConfig,
+    *,
+    analysis_project: ProjectRecord | None = None,
 ) -> tuple[list[CheckEntry], Counter[DiagnosticKey]]:
     """Extract diagnostics from file content.
 
@@ -1581,16 +1586,42 @@ def diagnostics_for_file(
     if record is None:
         return [], Counter()
 
+    configuration = ConfigurationDocmethis(
+        exception_analysis_depth=config.exception_analysis_depth,
+        exception_documentation_depth=config.exception_documentation_depth,
+    )
+    if analysis_project is None:
+        raw_records = []
+        analyze_project(project_root, configuration=configuration, skip_dynamic=True, write_cache=False, raw_records=raw_records)
+        analysis_project = ProjectRecord(project_root=project_root, project_name="snapshot", modules=raw_records)
+    record.file_path = file.resolve()
+    record = _enrich_snapshot(record, config, analysis_project)
     return produce_diagnostics(record, config, file=relative_path)
 
 
-def base_diagnostics(
+def _enrich_snapshot(record: ModuleRecord, config: CheckConfig, context: ProjectRecord | None = None) -> ModuleRecord:
+    """Rebuild exception facts on a private snapshot without mutating the source context."""
+    from copy import deepcopy  # noqa: PLC0415
+
+    # ponytail: clone the project per snapshot; memoize immutable contexts if bulk diagnostics dominate.
+    modules = [deepcopy(module) for module in context.modules if module.module_name != record.module_name] if context else []
+    snapshot = ProjectRecord(
+        project_root=context.project_root if context else record.file_path.parent,
+        project_name="snapshot",
+        modules=[*modules, record],
+    )
+    apply_project_passes(snapshot, exception_analysis_depth=config.exception_analysis_depth)
+    return record
+
+
+def base_diagnostics(  # noqa: PLR0913 - revision, policy and shared analysis context.
     base_rev: str,
     file: Path,
     project_root: Path,
     config: CheckConfig,
     *,
     snapshot_cache: dict[tuple[str, Path], BaseSnapshot | None] | None = None,
+    analysis_project: ProjectRecord | None = None,
 ) -> tuple[list[CheckEntry], Counter[DiagnosticKey]] | None:
     """Extract diagnostics from the base revision.
 
@@ -1627,7 +1658,13 @@ def base_diagnostics(
         return None
     if snapshot.record is None:
         return [], Counter()
-    return produce_diagnostics(snapshot.record, config, file=snapshot.relative_path)
+    record = (
+        next((module for module in analysis_project.modules if module.module_name == snapshot.record.module_name), None)
+        if analysis_project
+        else None
+    )
+    record = record or _enrich_snapshot(snapshot.record, config)
+    return produce_diagnostics(record, config, file=snapshot.relative_path)
 
 
 def base_functions(

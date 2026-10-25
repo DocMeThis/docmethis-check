@@ -389,7 +389,11 @@ def _analyze_documentation_impacts(  # noqa: PLR0913, PLR0917
         check entries.
 
     """
-    configuration_m1 = load_configuration(project_root)
+    configuration_m1 = replace(
+        load_configuration(project_root),
+        exception_analysis_depth=check_config.exception_analysis_depth,
+        exception_documentation_depth=check_config.exception_documentation_depth,
+    )
 
     with _base_head_models(
         project_head,
@@ -431,7 +435,9 @@ def _analyze_documentation_impacts(  # noqa: PLR0913, PLR0917
             and (record := head_index.get(delta.symbol)) is not None
             and record.file_path.resolve() in context_paths
         }
-        affected_callers = _affected_callers(callgraph_base, callgraph_head, exception_symbols)
+        affected_callers = _affected_callers(
+            callgraph_base, callgraph_head, exception_symbols, depth=configuration_m1.exception_analysis_depth
+        )
         deltas = _mark_affected_callers(deltas, affected_callers)
 
         cause_symbols = {
@@ -471,6 +477,7 @@ def _analyze_documentation_impacts(  # noqa: PLR0913, PLR0917
                         cause_symbols,
                         impact.value,
                         exception_types,
+                        depth=configuration_m1.exception_analysis_depth,
                     )
                     impact = replace(
                         impact,

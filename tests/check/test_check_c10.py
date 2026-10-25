@@ -1694,6 +1694,8 @@ def test_demo_three_featured_cases(tmp_path: Path) -> None:
         "pricing.load_price.load_price",
         "pricing.grille._read_grid",
     ]
+    assert blast["status"] == "treated"
+    assert blast["fixable"] is False
 
     contradiction = symbol_lookup[("pricing.grille.unit_price", "ValueError:local")]
     assert contradiction["status"] == "contradiction"
@@ -1703,7 +1705,7 @@ def test_demo_three_featured_cases(tmp_path: Path) -> None:
     assert first_io["status"] == "documentation_unchanged"
 
     dia_codes = [check.code for check in outcome.checks if check.dia is not None]
-    assert dia_codes.count(DMT_4201) >= 3
+    assert dia_codes.count(DMT_4201) == 2
 
     dia_errors = [check for check in outcome.checks if check.dia is not None and check.severity == "error"]
     assert dia_errors == []
