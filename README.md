@@ -97,10 +97,19 @@ reusable workflow `DocMeThis/docmethis-fix/.github/workflows/fix.yml`, pinned by
 full SHA, which requires the private runtime, Fix configuration, Gateway key,
 provider credentials, and a write-capable GitHub App token brokered by Gateway.
 
-> **Security note:** This workflow uses `@main`, so it follows the latest code
-> on the DocMeThis Check `main` branch. This is useful for testing the action
-> itself. When using the workflow in another repository, replace `@main` with
-> the full commit SHA associated with the release tag you choose.
+In the configuration block at the top of the copied workflow:
+
+1. Comment out the active `DOCMETHIS_CHECK_ACTION` line whose value is `"./"`.
+2. Uncomment the `DOCMETHIS_CHECK_ACTION` line containing `DocMeThis/docmethis-check@...`.
+
+Keep the YAML anchor `&docmethis_check_action` and leave only one of these lines
+active. The release reference is already filled in with its full commit SHA and
+is maintained by DocMeThis in the template for each new release. To upgrade a
+copied workflow later, use the pinned reference from the updated template.
+
+This repository sets the value to `"./"` to test the checked-out action, including
+pull request changes. The `uses: *docmethis_check_action` step reuses the value
+through a YAML alias; no `${{ env... }}` expression is used in `uses`.
 
 The workflow downloads your project and runs Check on every pull request. It
 keeps the project's history so Check can compare the version you are submitting
