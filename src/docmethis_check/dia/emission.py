@@ -11,6 +11,7 @@ from docmethis_extract_python.api import ClassRecord, Confidence, FunctionRecord
 from docmethis_verify.dmt import DIA_CODE_BY_IMPACT_KIND
 from docmethis_verify.docstring.numpy_parser import parse_numpy_docstring
 from docmethis_verify.docstring.section_parser import find_section, parse_raises
+from docmethis_verify.exception_scope import documentable_exceptions
 
 from docmethis_check.diagnostics import DiagnosticKey, _compute_docstring_sha256, _relative_path_or_none, _simple_exception_name
 from docmethis_check.models import CheckEntry, Severity, SymbolKind
@@ -91,6 +92,7 @@ def _emit_dia_delta(  # noqa: PLR0911
         record_base,
         impact_kind,
         analysis_completeness=emission.completeness,
+        exception_documentation_depth=emission.configuration.exception_documentation_depth,
     )
 
     provenance = _delta_provenance(delta)
@@ -98,6 +100,14 @@ def _emit_dia_delta(  # noqa: PLR0911
     fixable = (
         _DEFAULT_FIX_SUPPORT.get(impact_kind, False) and local_documentation is not None if impact_kind is not None else False
     )
+    if impact_kind in {"exposed_exception", "removed_exception"}:
+        scope_record = record_base if impact_kind == "removed_exception" else record_head
+        if scope_record is not None and hasattr(scope_record, "exceptions"):
+            allowed = documentable_exceptions(scope_record, depth=emission.configuration.exception_documentation_depth)
+            if _simple_exception_name(_exception_type(delta.value)) not in {
+                _simple_exception_name(exception.exception_type) for exception in allowed
+            }:
+                fixable = False
     confidence = delta.confidence
     completeness = delta.impact_completeness
     file = _report_file(record_head.file_path, emission.project_root)
@@ -334,13 +344,14 @@ def _documented_raise_types(
     return {_simple_exception_name(raise_.exception) for raise_ in parse_raises(find_section(parsed, "Raises"))}
 
 
-def _documentation_status(  # noqa: C901, PLR0911
+def _documentation_status(  # noqa: C901, PLR0911, PLR0913 - explicit comparison and documentary policy.
     delta: DeltaBehavioral,
     record_head: FunctionRecord | ClassRecord,
     record_base: FunctionRecord | ClassRecord | None,
     impact_kind: str,
     *,
     analysis_completeness: str = "complete",
+    exception_documentation_depth: int = 1,
 ) -> str:
     """Return the delta's documentation status.
 
@@ -382,6 +393,26 @@ def _documentation_status(  # noqa: C901, PLR0911
         documented_types = _documented_raise_types(record_head, documentation_head)
         target_type = _simple_exception_name(_exception_type(delta.value))
         documented = target_type in documented_types
+        allowed_head = (
+            {
+                _simple_exception_name(exception.exception_type)
+                for exception in documentable_exceptions(record_head, depth=exception_documentation_depth)
+            }
+            if hasattr(record_head, "exceptions")
+            else set()
+        )
+        allowed_base = (
+            {
+                _simple_exception_name(exception.exception_type)
+                for exception in documentable_exceptions(record_base, depth=exception_documentation_depth)
+            }
+            if record_base is not None and hasattr(record_base, "exceptions")
+            else set()
+        )
+        if impact_kind == "exposed_exception" and target_type not in allowed_head:
+            return "treated"
+        if impact_kind == "removed_exception" and (target_type in allowed_head or target_type not in allowed_base):
+            return "treated"
 
         if impact_kind == "exposed_exception":
             if documented:

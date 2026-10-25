@@ -109,7 +109,7 @@ def _base_head_models(  # noqa: PLR0913, PLR0917
 
         base_project = ProjectRecord(project_root=project_root, project_name=project_head.project_name)
         base_project.modules = base_modules
-        _apply_project_passes(base_project)
+        _apply_project_passes(base_project, exception_analysis_depth=configuration.exception_analysis_depth)
 
         yield BaseHeadModels(
             base=base_project,
@@ -245,7 +245,7 @@ def _inconclusive(project_head: ProjectRecord, reason: str) -> BaseHeadModels:
     return BaseHeadModels(base=base, completeness="inconclusive", reason=reason)
 
 
-def _apply_project_passes(project: ProjectRecord) -> None:
+def _apply_project_passes(project: ProjectRecord, *, exception_analysis_depth: int = 2) -> None:
     """Apply the same project passes as the head analysis.
 
     Parameters
@@ -254,7 +254,7 @@ def _apply_project_passes(project: ProjectRecord) -> None:
         The project record to which the passes are applied.
 
     """
-    apply_project_passes(project)
+    apply_project_passes(project, exception_analysis_depth=exception_analysis_depth)
 
 
 def _base_revision_available(base_rev: str, project_root: Path) -> bool:

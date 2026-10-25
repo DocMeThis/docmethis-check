@@ -10,7 +10,7 @@ from importlib import resources
 from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, cast
 
-from docmethis_extract_python.api import PropertyAccessor, Visibility
+from docmethis_extract_python.api import ConfigurationDocmethis, PropertyAccessor, Visibility, load_configuration
 from docmethis_verify.validation import (
     OptionalStr,
     StrictBool,
@@ -249,6 +249,10 @@ class CheckConfig:
         Project-relative files or directory prefixes excluded from Check and DIA.
     dia_exclude_paths : tuple[str, ...]
         Project-relative files or directory prefixes excluded from DIA only.
+    exception_analysis_depth : int
+        Maximum exception call distance retained by AST analysis and DIA.
+    exception_documentation_depth : int
+        Strict documentary exception scope, bounded by the analysis depth.
 
     Raises
     ------
@@ -278,6 +282,8 @@ class CheckConfig:
     method_exception_contract: MethodExceptionContract = MethodExceptionContract.CALLABLE
     exclude_paths: tuple[str, ...] = ()
     dia_exclude_paths: tuple[str, ...] = ()
+    exception_analysis_depth: int = 2
+    exception_documentation_depth: int = 1
 
     def __post_init__(self) -> None:
         """Validate the direct Check configuration contract.
@@ -292,6 +298,10 @@ class CheckConfig:
         Path filters are normalized after the scalar and collection settings are validated.
 
         """
+        ConfigurationDocmethis(
+            exception_analysis_depth=self.exception_analysis_depth,
+            exception_documentation_depth=self.exception_documentation_depth,
+        )
         type_check(value=self.fail_on_warning, expected_alias_type=StrictBool, field="fail_on_warning")
         type_check(value=self.dia, expected_alias_type=StrictBool, field="dia")
         object.__setattr__(self, "severity", _validate_severity_mapping(self.severity, field="severity"))
@@ -439,6 +449,7 @@ def load_check_config(  # noqa: C901, PLR0913
     data = _read_pyproject(root / "pyproject.toml")
     section = _check_section(data)
     _validate_check_keys(section)
+    extraction = load_configuration(root)
 
     config = CheckConfig(
         fail_on_warning=_read_bool(section, "fail-on-warning", default=False),
@@ -464,6 +475,8 @@ def load_check_config(  # noqa: C901, PLR0913
         forbidden_terms=_load_forbidden_terms(root),
         exclude_paths=_read_path_filters(section, "exclude-paths"),
         dia_exclude_paths=_read_path_filters(section, "dia-exclude-paths"),
+        exception_analysis_depth=extraction.exception_analysis_depth,
+        exception_documentation_depth=extraction.exception_documentation_depth,
     )
 
     if fail_on_warning is not None:

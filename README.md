@@ -115,6 +115,23 @@ responsibility of the repository's CI. Fork pull requests are skipped.
 
 ### Local CLI
 
+Exception propagation and documentation have separate project settings:
+
+```toml
+[tool.docmethis]
+exception_analysis_depth = 2
+exception_documentation_depth = 1
+```
+
+Depth counts call edges: 0 is local raises only, 1 also includes direct callees.
+Values are strict non-negative integers; documentation cannot exceed analysis.
+Direct diagnostics, BASE/HEAD snapshots, Verify and Fix share enriched exception
+facts and the documentary selection. DIA retains deeper analyzed impacts, while
+out-of-documentary-scope exception impacts do not request documentary additions.
+Delegating a local raise to a direct helper does not invalidate its existing
+documentation at the default documentary depth. Known exceptions beyond the
+documentary limit are DMT-4002 candidates even though they remain AST facts.
+
 The Check CLI requires Python 3.12+ and Git. The inspected project does not
 need to declare the same Python version, but its source must parse with the
 Python grammar of the interpreter running Check.
