@@ -252,6 +252,8 @@ def _apply_project_passes(project: ProjectRecord, *, exception_analysis_depth: i
     ----------
     project : ProjectRecord
         The project record to which the passes are applied.
+    exception_analysis_depth : int = 2
+        The depth of exception analysis to perform during the project passes.
 
     """
     apply_project_passes(project, exception_analysis_depth=exception_analysis_depth)

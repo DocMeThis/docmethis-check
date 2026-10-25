@@ -52,7 +52,10 @@ class _DiagnosticContext:
         Root directory of the project.
     base_snapshot_cache : dict[tuple[str, Path], BaseSnapshot | None]
         Cache mapping (revision, file path) to base snapshots.
-
+    head_project
+        Holds the head project record for the diagnostic context, or None when not provided.
+    base_project
+        ProjectRecord or None, defaulting to None.
     """
 
     configuration: CheckConfig

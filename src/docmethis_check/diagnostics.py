@@ -1548,10 +1548,8 @@ def diagnostics_for_file(
 ) -> tuple[list[CheckEntry], Counter[DiagnosticKey]]:
     """Extract diagnostics from file content.
 
-    The content is written to a temporary directory to reuse M1, which extracts
-    a ``ModuleRecord`` from a ``Path``. The analysis therefore runs on an
-    isolated content snapshot while retaining only the relative path for the
-    module name and diagnostics.
+    The content is written to a temporary directory to reuse M1, which extracts a ``ModuleRecord`` from a ``Path``. The analysis
+    therefore runs on an isolated content snapshot while retaining only the relative path for the module name and diagnostics.
 
     Parameters
     ----------
@@ -1564,6 +1562,10 @@ def diagnostics_for_file(
     config : CheckConfig
         Configuration controlling which diagnostics are produced.
 
+    analysis_project : ProjectRecord | None = None
+        Optional project record used to enrich the module snapshot. If None, the project is analyzed from scratch from the project
+        root.
+
     Returns
     -------
     tuple[list[CheckEntry], Counter[DiagnosticKey]]
@@ -1572,9 +1574,8 @@ def diagnostics_for_file(
 
     Notes
     -----
-    Isolation in a temporary directory means detections that depend on nearby
-    files (``py.typed``, ``conftest.py``, and so on) can differ from analysis of
-    the real files.
+    Isolation in a temporary directory means detections that depend on nearby files (``py.typed``, ``conftest.py``, and so on) can
+    differ from analysis of the real files.
 
     """
     relative_path = _relative_path_or_none(file, project_root)
@@ -1600,7 +1601,29 @@ def diagnostics_for_file(
 
 
 def _enrich_snapshot(record: ModuleRecord, config: CheckConfig, context: ProjectRecord | None = None) -> ModuleRecord:
-    """Rebuild exception facts on a private snapshot without mutating the source context."""
+    """Rebuild exception facts on a private snapshot without mutating the source context.
+
+    Parameters
+    ----------
+    record : ModuleRecord
+        The module record to enrich with rebuilt exception facts. It is the specific module deep-copied into a private snapshot
+        for isolated analysis before project passes are applied.
+    config : CheckConfig
+        The CheckConfig object providing the configuration settings for the snapshot enrichment. It dictates the depth of the
+        exception analysis to apply when rebuilding exception facts on the private snapshot.
+    context : ProjectRecord | None = None
+        The source project context used to build the private snapshot. If provided, its modules (excluding the target record's
+        module) and project root are copied into the snapshot. If ``None``, the snapshot is constructed using only the target
+        record and its parent directory as the root.
+
+    Returns
+    -------
+    ModuleRecord
+        Creates a deep copy of the modules from the given context (excluding the record's own module), constructs a new project
+        snapshot with those copies and the provided record, runs exception analysis passes on the snapshot using the configured
+        depth, and returns the original record unmodified.
+
+    """
     from copy import deepcopy  # noqa: PLC0415
 
     # ponytail: clone the project per snapshot; memoize immutable contexts if bulk diagnostics dominate.
@@ -1638,6 +1661,11 @@ def base_diagnostics(  # noqa: PLR0913 - revision, policy and shared analysis co
     snapshot_cache : dict[tuple[str, Path], BaseSnapshot | None] | None = None
         Optional cache mapping a revision and file path to a BaseSnapshot or None, used to reuse previously computed base
         snapshots for the same revision and file across multiple calls.
+
+    analysis_project : ProjectRecord | None = None
+        Optional project record used to resolve module information for diagnostics. When provided, the function attempts to locate
+        a matching module by name from this record to produce diagnostics; if the project record is None or no matching module is
+        found, the base snapshot record is enriched directly from the configuration instead.
 
     Returns
     -------

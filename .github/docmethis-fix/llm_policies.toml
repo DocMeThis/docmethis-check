@@ -8,7 +8,8 @@ max_attempts = 3
 timeout_seconds = 30.0
 token_budget = 3000
 prompt_variant = "compact"
-structured_output_mode = "guided_json"
+# Native JSON Schema support varies across provider routes; Fix still validates JSON locally.
+structured_output_mode = "json_prompted"
 
 [fix.default.generation_options]
 temperature = 0.6

@@ -369,6 +369,11 @@ def _documentation_status(  # noqa: C901, PLR0911, PLR0913 - explicit comparison
     analysis_completeness : str = 'complete'
         Determines the completeness level of the analysis used when verifying exception removal; the default is 'complete'.
 
+    exception_documentation_depth : int = 1
+        Maximum depth for traversing the call graph when determining which exceptions are documentable for the head record and the
+        base record (if present). A depth of 1 considers only exceptions directly raised in the function or class, while larger
+        values include exceptions raised by nested calls. The default is 1.
+
     Returns
     -------
     str
