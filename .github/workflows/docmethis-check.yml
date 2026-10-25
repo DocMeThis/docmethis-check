@@ -2,6 +2,17 @@
 # It runs Check only: the action reports findings and never applies Fix patches.
 name: DocMeThis Check
 
+env:
+  ##################################################################################
+  ##                             MODIFY  THESE  LINES                             ##
+  ##################################################################################
+  # "./" is only valid within the docmethis-check repository
+  DOCMETHIS_CHECK_ACTION: &docmethis_check_action "./"  # COMMENT THIS LINE
+  #
+  # To enable DocMeThis Check on your own repository, uncomment the next line
+  # DOCMETHIS_CHECK_ACTION: &docmethis_check_action "DocMeThis/docmethis-check@065c2cc968d67c01a832d42afe8a920f09b13fe5"  # 0.1.1
+  ##################################################################################
+
 on:
   pull_request:
   push:
@@ -31,12 +42,8 @@ jobs:
           restore-keys: |
             docmethis-extract-v5-${{ runner.os }}-${{ hashFiles('pyproject.toml') }}-
 
-      # Security note: @main follows the latest code on the DocMeThis Check
-      # main branch. This repository uses it to test the action itself. When
-      # copying this workflow, replace @main with the full commit SHA associated
-      # with the release tag you choose.
       - name: Check documentation consistency
-        uses: DocMeThis/docmethis-check@main
+        uses: *docmethis_check_action
         env:
           GITHUB_BEFORE_SHA: ${{ github.event.before }}
 
