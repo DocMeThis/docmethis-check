@@ -253,7 +253,19 @@ def _unresolved_merge_request(
     *,
     reason: str,
 ) -> Never:
-    """Raise a controlled error for an unresolved GitLab MR."""
+    """Raise a controlled error for an unresolved GitLab MR.
+
+    Parameters
+    ----------
+    reason : str
+        Accepts a required keyword-only string argument named reason. Uses it to build an error message in which underscores in
+        reason are replaced with spaces, then raises NoDiffBaseError with that message.
+
+    Raises
+    ------
+    NoDiffBaseError
+        Explicitly raised.
+    """
     msg = f"GitLab merge request diff is unavailable: {reason.replace('_', ' ')}."
     raise NoDiffBaseError(msg)
 
@@ -267,7 +279,48 @@ def _resolve_ci_merge_request(  # noqa: PLR0913
     commit_sha: str | None,
     source_branch_sha: str | None,
 ) -> DiffRange:
-    """Resolve the exact source diff for a GitLab merge request pipeline."""
+    """Resolve the exact source diff for a GitLab merge request pipeline.
+
+    Parameters
+    ----------
+    git : str
+        The keyword-only git parameter is a string passed to the internal _commit_exists helper to check whether the base and head
+        revisions exist before constructing a DiffRange.
+    project_root : Path
+        Specifies the filesystem directory against which Git commit existence checks are performed when resolving a merge request
+        diff range.
+    event_type : str | None
+        When event_type is one of "detached", "merged_result", or "merge_train", selects a corresponding strategy and head commit
+        source: commit_sha for detached, source_branch_sha for merged_result and merge_train. If event_type is not one of those
+        values, returns an unresolved merge request result with reason "missing_merge_request_event_type" when event_type is
+        falsy, or "unknown_merge_request_event_type" otherwise. When diff_base_sha is falsy or a zero SHA, returns an unresolved
+        result with reason "missing_merge_request_diff_base_sha". When the selected head report is falsy or a zero SHA, returns an
+        unresolved result with reason "missing_merge_request_source_branch_sha" for non-detached events or
+        "missing_merge_request_commit_sha" for detached. When the base or head commit does not exist, returns an unresolved result
+        with reason "merge_request_base_not_found" or "merge_request_head_not_found", respectively. Otherwise returns a complete
+        DiffRange with revision_spec set to base..head, the selected strategy, and the resolved base and head revisions.
+    diff_base_sha : str | None
+        A keyword-only parameter annotated as str or None with no default. When it is falsy or a zero SHA, the function treats the
+        base revision as missing and returns an unresolved merge request result with reason "missing_merge_request_diff_base_sha".
+        Otherwise it is used as the base revision, and if the commit does not exist the function returns an unresolved merge
+        request result with reason "merge_request_base_not_found".
+    commit_sha : str | None
+        Passed as a keyword-only argument annotated as str or None, with no default. When event_type is "detached", commit_sha
+        supplies the head revision: if it is present, non-zero, and exists as a commit, it is used to build the returned
+        DiffRange; if it is absent, zero, or nonexistent, the function returns an unresolved merge request result instead.
+    source_branch_sha : str | None
+        A required keyword-only parameter named source_branch_sha, annotated as str or None. For event types merged_result and
+        merge_train it supplies the head revision, which is used only when non-empty and not a zero SHA; otherwise the result is
+        unresolved with reason missing_merge_request_source_branch_sha.
+
+    Returns
+    -------
+    DiffRange
+        Returns a complete DiffRange with revision_spec formed as '<base_rev>..<head_rev>', the strategy selected from the event
+        type ('gitlab_merge_request_diff_base' for detached, 'gitlab_merged_result' for merged_result, 'gitlab_merge_train' for
+        merge_train), completeness 'complete', and base_rev and head_rev set to the resolved commit SHAs. Otherwise returns a
+        DiffRange produced by _unresolved_merge_request without a specified contract.
+    """
     strategies = {
         "detached": ("gitlab_merge_request_diff_base", commit_sha),
         "merged_result": ("gitlab_merged_result", source_branch_sha),
