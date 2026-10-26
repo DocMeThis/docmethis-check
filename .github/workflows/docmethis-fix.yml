@@ -13,7 +13,7 @@ jobs:
     # dans le workflow officiel `fix.yml`, approuvé côté Gateway.
     # TODO(F20) : remplacer ce SHA par celui approuvé après publication du
     # workflow renommé.
-    uses: DocMeThis/docmethis-fix/.github/workflows/fix.yml@e81a8700ac07fd890319978564abddaafc3ffc2b
+    uses: DocMeThis/docmethis-fix/.github/workflows/fix.yml@ac39cb5ad9acf37500a6037bf0a31885a0e6bc30
     permissions:
       contents: read
       id-token: write
