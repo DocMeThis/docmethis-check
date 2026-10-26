@@ -317,6 +317,31 @@ class TestConfigEnum:
         with pytest.raises(ValueError, match="regresion"):
             load_check_config(tmp_path)
 
+    def test_no_cache_defaults_to_false_and_loads_from_pyproject(self, tmp_path: Path) -> None:
+        (tmp_path / "pyproject.toml").write_text("[tool.docmethis.check]\n", encoding="utf-8")
+        assert load_check_config(tmp_path).no_cache is False
+
+        (tmp_path / "pyproject.toml").write_text("[tool.docmethis.check]\nno-cache = true\n", encoding="utf-8")
+        assert load_check_config(tmp_path).no_cache is True
+
+    def test_no_cache_config_can_be_overridden(self, tmp_path: Path) -> None:
+        (tmp_path / "pyproject.toml").write_text("[tool.docmethis.check]\nno-cache = true\n", encoding="utf-8")
+        assert load_check_config(tmp_path, no_cache=False).no_cache is False
+
+    def test_no_cache_cli_cache_flag_overrides_pyproject(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        (tmp_path / "pyproject.toml").write_text("[tool.docmethis.check]\nno-cache = true\n", encoding="utf-8")
+        captured: dict[str, object] = {}
+
+        def _run_check(**kwargs: object) -> CheckResult:
+            captured.update(kwargs)
+            return CheckResult()
+
+        monkeypatch.setattr(cli, "run_check", _run_check)
+        assert cli.main([str(tmp_path), "--cache", "--format", "json"]) == 0
+        config = captured["config"]
+        assert isinstance(config, CheckConfig)
+        assert config.no_cache is False
+
     def test_annotation_placement_defaults(self, tmp_path: Path) -> None:
         (tmp_path / "pyproject.toml").write_text("[tool.docmethis.check]\n", encoding="utf-8")
         config = load_check_config(tmp_path)
@@ -1030,6 +1055,11 @@ def test_entrypoint_publishes_annotations_from_file() -> None:
     assert '--github-output-file "$annotations_file"' in payload
     assert 'cat "$annotations_file"' in payload
     assert "--format github" not in payload
+    assert 'true) set -- "$@" --no-cache ;;' in payload
+    assert 'false) set -- "$@" --cache ;;' in payload
+    action = Path("action.yml").read_text(encoding="utf-8")
+    assert "  no-cache:" in action
+    assert '"${{ inputs.no-cache }}"' in action
 
 
 @pytest.mark.parametrize("value", ["treu", "True", "0"])

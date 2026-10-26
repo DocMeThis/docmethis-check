@@ -30,6 +30,9 @@ inputs:
   check-mode:
     description: "Check mode: regression or catchup. Empty uses the default (regression)."
     required: false
+  no-cache:
+    description: "Disable extraction cache reads and writes. true/false forces a value; empty uses pyproject.toml."
+    required: false
   annotation-placement:
     description: "Annotation placement: signature, docstring, or precise. Empty uses the default (signature)."
     required: false
@@ -62,6 +65,8 @@ runs:
     - "${{ inputs.on-nonlinear-push-without-base }}"
     - "--check-mode"
     - "${{ inputs.check-mode }}"
+    - "--no-cache"
+    - "${{ inputs.no-cache }}"
     - "--annotation-placement"
     - "${{ inputs.annotation-placement }}"
     - "--exclude-paths"

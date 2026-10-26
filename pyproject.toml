@@ -101,6 +101,7 @@ patterns = [
 [tool.docmethis.check]
 annotation-placement = "precise"
 check-mode = "regression"
+no-cache = true
 dia = true
 exclude-paths = ["tests"]
 fail-on-warning = true
