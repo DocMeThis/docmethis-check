@@ -31,7 +31,21 @@ if TYPE_CHECKING:
 
 
 def _record_accessor_kind(record: object) -> str | None:
-    """Return a stable getter/setter role for a property record."""
+    """Return a stable getter/setter role for a property record.
+
+    Parameters
+    ----------
+    record : object
+        The record argument is a positional-or-keyword parameter annotated as object with no default. The function returns None
+        when the record's method_kind value is not "property". Otherwise it reads property_accessor, using its value attribute
+        when present, and returns that value if it is "getter" or "setter"; any other value is reported as "getter".
+
+    Returns
+    -------
+    str | None
+        Returns None when the record's method_kind value is not "property". Otherwise, returns the property_accessor value when it
+        is "getter" or "setter", and "getter" in all other cases.
+    """
     method_kind = getattr(record, "method_kind", None)
     if getattr(method_kind, "value", method_kind) != "property":
         return None
@@ -42,7 +56,24 @@ def _record_accessor_kind(record: object) -> str | None:
 
 
 def _accessor_is_enabled(record: object, configuration: CheckConfig) -> bool:
-    """Return whether a property accessor is selected by configuration."""
+    """Return whether a property accessor is selected by configuration.
+
+    Parameters
+    ----------
+    record : object
+        Accepts a positional-or-keyword argument named record, annotated as object, with no default. Its accessor kind is
+        determined by the opaque helper _record_accessor_kind. Returns true if that kind is None or belongs to the set of accessor
+        values selected by the supplied CheckConfig's property_accessors; otherwise returns false.
+    configuration : CheckConfig
+        Accepts a required configuration argument of type CheckConfig. The function returns true when the record's accessor kind
+        is absent or is among the property accessor values in the configuration, and false otherwise.
+
+    Returns
+    -------
+    bool
+        Returns true when the record's accessor kind is absent, or when it is present among the accessor values selected in the
+        configuration; otherwise returns false.
+    """
     accessor_kind = _record_accessor_kind(record)
     return accessor_kind is None or accessor_kind in {accessor.value for accessor in configuration.property_accessors}
 
