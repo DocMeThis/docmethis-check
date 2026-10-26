@@ -1,0 +1,39 @@
+docmethis_check:
+  image:
+    # Replace this placeholder with the digest emitted by publish-docker.yml.
+    name: "$DOCMETHIS_CHECK_IMAGE"
+    entrypoint: [""]
+
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS'
+      when: never
+    - if: '$CI_COMMIT_BRANCH'
+    - when: never
+
+  variables:
+    DOCMETHIS_CHECK_IMAGE: "ghcr.io/docmethis/docmethis-check@sha256:<release-digest>"
+    GIT_DEPTH: "0"
+
+  before_script:
+    - git config --global --add safe.directory "$CI_PROJECT_DIR"
+    - |
+      if [ "$CI_PIPELINE_SOURCE" = "merge_request_event" ] &&
+        { [ "$CI_MERGE_REQUEST_EVENT_TYPE" = "merged_result" ] ||
+          [ "$CI_MERGE_REQUEST_EVENT_TYPE" = "merge_train" ]; }
+      then
+        git checkout --detach "$CI_MERGE_REQUEST_SOURCE_BRANCH_SHA"
+      fi
+
+  script:
+    - >
+      python -m docmethis_check
+      --gitlab-output-file gl-code-quality-report.json
+      --json-output-file docmethis-report.json
+
+  artifacts:
+    when: always
+    reports:
+      codequality: gl-code-quality-report.json
+    paths:
+      - docmethis-report.json

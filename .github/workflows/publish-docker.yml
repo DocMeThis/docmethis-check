@@ -1,0 +1,91 @@
+name: Publish Docker image
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE_NAME: ghcr.io/docmethis/docmethis-check
+
+jobs:
+  publish:
+    name: Publish release image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Derive release version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          printf 'version=%s\n' "$version" >> "$GITHUB_OUTPUT"
+
+      - name: Verify project version matches release tag
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          project_version="$(python - <<'PY'
+          import tomllib
+          from pathlib import Path
+
+          with Path("pyproject.toml").open("rb") as file_handle:
+              print(tomllib.load(file_handle)["project"]["version"])
+          PY
+          )"
+          if [ "$project_version" != "$RELEASE_VERSION" ]; then
+            printf 'pyproject.toml version %s does not match release tag %s\n' "$project_version" "$RELEASE_VERSION" >&2
+            exit 1
+          fi
+
+      - name: Log in to GHCR
+        uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1  # v3.5.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f7ce87c1d6bead3e36075b2ce75da1f6cc28aaca  # v3.9.0
+
+      - name: Build and push release image
+        id: image
+        uses: docker/build-push-action@ee4ca427a2f43b6a16632044ca514c076267da23  # v6.19.0
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/DocMeThis/docmethis-check
+            org.opencontainers.image.version=${{ steps.version.outputs.version }}
+
+      - name: Smoke test published image
+        env:
+          IMAGE_REFERENCE: ${{ env.IMAGE_NAME }}@${{ steps.image.outputs.digest }}
+        run: |
+          set -euo pipefail
+          docker run --rm --entrypoint /bin/sh "$IMAGE_REFERENCE" -c \
+            "python -m docmethis_check --help >/dev/null && git --version"
+
+      - name: Summarize immutable image reference
+        env:
+          IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
+          IMAGE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          {
+            printf '### Published Docker image\n\n'
+            printf '%s\n' "- Tag: \`$IMAGE_NAME:$IMAGE_VERSION\`"
+            printf '%s\n' "- Digest: \`$IMAGE_NAME@$IMAGE_DIGEST\`"
+          } >> "$GITHUB_STEP_SUMMARY"
