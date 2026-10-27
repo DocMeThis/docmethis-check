@@ -1,6 +1,6 @@
 [project]
 name = "docmethis-check"
-version = "0.1.2"
+version = "0.1.1234"
 description = "Diff-first Python docstring consistency checks for CI."
 readme = "README.md"
 requires-python = ">=3.12"
