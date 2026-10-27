@@ -8,16 +8,13 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends git \
     && rm -rf /var/lib/apt/lists/*
 
-COPY pyproject.toml README.md /app/
-
+COPY pyproject.toml README.md LICENSE /app/
+COPY src /app/src
 RUN python -m pip install --no-cache-dir \
       --index-url https://pkg.docmethis.com \
       --extra-index-url https://pypi.org/simple \
-      'docmethis-extract-python>=0.1.0' \
-      'docmethis-verify>=0.1.0'
-
-COPY src /app/src
-RUN python -m pip install --no-cache-dir --no-deps .
+      . \
+    && python -m pip check
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
